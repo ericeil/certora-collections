@@ -7,6 +7,7 @@ plugins {
 	id("io.github.detekt.gradle.compiler-plugin")
     id("java-library")
     id("maven-publish")
+    id("org.jetbrains.dokka")
 }
 
 kotlin {
