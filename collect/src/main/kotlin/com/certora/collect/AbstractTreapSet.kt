@@ -5,7 +5,7 @@ package com.certora.collect
     behavior such as hash collisions.  See `Treap` for an overview of all of this.
  */
 internal abstract class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S>>(
-    left: S?, 
+    left: S?,
     right: S?
 ) : TreapSet<E>, Treap<E, S>(left, right) {
     /**
@@ -62,6 +62,8 @@ internal abstract class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S
     abstract fun shallowRemoveAll(predicate: (E) -> Boolean): S?
     abstract fun shallowContainsAll(elements: S): Boolean
     abstract fun shallowContainsAny(elements: S): Boolean
+
+    abstract fun shallowSequence(): Sequence<E>
 
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,7 +146,7 @@ internal abstract class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S
 
     override fun forEachElement(action: (element: E) -> Unit): Unit {
         left?.forEachElement(action)
-        shallowForEach(action) 
+        shallowForEach(action)
         right?.forEachElement(action)
     }
 
@@ -152,6 +154,22 @@ internal abstract class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S
         left === null && right === null -> shallowGetSingleElement()
         else -> null
     }
+
+    override fun <R> treapFold(initial: R, operation: (left: R, right: R, elems: Sequence<E>) -> R): R  =
+        operation(
+            if (left == null) { initial } else { left.treapFold(initial, operation) },
+            if (right == null) { initial } else { right.treapFold(initial, operation) },
+            shallowSequence()
+        )
+
+    override fun <R : Any> treapFold(cache: TreapSetFoldCache, initial: R, operation: (left: R, right: R, elems: Sequence<E>) -> R): R  =
+        cache(this) {
+            operation(
+                if (left == null) { initial } else { left.treapFold(cache, initial, operation) },
+                if (right == null) { initial } else { right.treapFold(cache, initial, operation) },
+                shallowSequence()
+            )
+        }
 }
 
 /**

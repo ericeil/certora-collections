@@ -28,7 +28,7 @@ internal class EmptyTreapSet<@Treapable E> private constructor() : TreapSet<E>, 
     @Suppress("Treapability", "UNCHECKED_CAST")
     override fun add(element: E): TreapSet<E> = when (element) {
         is PrefersHashTreap -> HashTreapSet(element)
-        is Comparable<*> -> 
+        is Comparable<*> ->
             SortedTreapSet<Comparable<Comparable<*>>>(element as Comparable<Comparable<*>>) as TreapSet<E>
         else -> HashTreapSet(element)
     }
@@ -40,7 +40,10 @@ internal class EmptyTreapSet<@Treapable E> private constructor() : TreapSet<E>, 
         elements is PersistentSet.Builder<*> -> elements.build() as TreapSet<E>
         else -> elements.fold(this as TreapSet<E>) { set, element -> set.add(element) }
     }
-        
+
+    override fun <R> treapFold(initial: R, operation: (left: R, right: R, elems: Sequence<E>) -> R): R = initial
+    override fun <R : Any> treapFold(cache: TreapSetFoldCache, initial: R, operation: (left: R, right: R, elems: Sequence<E>) -> R): R = initial
+
     companion object {
         private val instance = EmptyTreapSet<Nothing>()
         @Suppress("UNCHECKED_CAST")

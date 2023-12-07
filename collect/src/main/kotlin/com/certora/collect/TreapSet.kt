@@ -52,6 +52,17 @@ public interface TreapSet<out T> : PersistentSet<T> {
         which may be more efficient than [forEach].
      */
     public fun forEachElement(action: (element: T) -> Unit): Unit
+
+    /**
+        Traverses the treap, calling [operation] for each node, and accumulating the results.
+     */
+    public fun <R> treapFold(initial: R, operation: (left: R, right: R, elems: Sequence<T>) -> R): R
+
+    /**
+        Traverses the treap, calling [operation] for each node, and accumulating the results.  Intermediate results are
+        cached in [cache], which can significantly speed up this operation when applied to multiple related [TreapSet]s.
+     */
+    public fun <R : Any> treapFold(cache: TreapSetFoldCache, initial: R, operation: (left: R, right: R, elems: Sequence<T>) -> R): R
 }
 
 /**
