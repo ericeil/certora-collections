@@ -28,6 +28,7 @@ detekt {
 
 dependencies {
 	implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:${property("immutableCollectionsVersion")}")
+    implementation("com.thedeanda:lorem:2.2")
     detektPlugins(project(":detekt-treapability"))
     testImplementation("org.jetbrains.kotlin:kotlin-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
@@ -72,7 +73,7 @@ publishing {
 }
 
 task("printSampleGraphs", JavaExec::class) {
-    main = "com.certora.collect.PrettyPrinterKt"
+    main = "com.certora.collect.SamplePrinterKt"
     args = listOf("$buildDir/reports/sample-graphs/")
     classpath = sourceSets["main"].runtimeClasspath
 }
