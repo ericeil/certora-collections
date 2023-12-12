@@ -70,3 +70,9 @@ publishing {
         }
     }
 }
+
+task("printSampleGraphs", JavaExec::class) {
+    main = "com.certora.collect.PrettyPrinterKt"
+    args = listOf("$buildDir/reports/sample-graphs/")
+    classpath = sourceSets["main"].runtimeClasspath
+}
