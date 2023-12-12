@@ -37,20 +37,41 @@ public object PrettyPrinter {
 }
 
 public fun main(args: Array<String>) {
-
-    val a = (1..100).toTreapSet()
-    val b = (5..10).toTreapSet()
-    val sets = mapOf("a" to a, "b" to b, "a+b" to a+b)
-
-    val setsText = """
-# Union
-```mermaid
-${PrettyPrinter.printMermaidGraph(sets)}
-```
-```
-    """.trimIndent()
-
     val outputDir = Path.of(args[0])
     Files.createDirectories(outputDir)
-    Files.writeString(outputDir.resolve("sets.md"), setsText)
+    Files.newBufferedWriter(outputDir.resolve("sets.md")).use { file ->
+        fun sample(name: String, sets: () -> Map<String, TreapSet<Int>>) {
+        val setsText = """
+# $name
+```mermaid
+${PrettyPrinter.printMermaidGraph(sets())}
+```
+"""
+        file.write(setsText)
+        }
+
+        sample("Union disjoint sets") {
+            val a = (1..20).toTreapSet()
+            val b = (10..30).toTreapSet()
+            mapOf("a" to a, "b" to b, "a+b" to a+b)
+        }
+
+        sample("Union overlapping sets") {
+            val a = (1..20).toTreapSet()
+            val b = (10..30).toTreapSet()
+            mapOf("a" to a, "b" to b, "a+b" to a+b)
+        }
+
+        sample("Intersect overlapping sets") {
+            val a = (1..20).toTreapSet()
+            val b = (10..30).toTreapSet()
+            mapOf("a" to a, "b" to b, "a intersect b" to (a intersect b))
+        }
+
+        sample("Subtract overlapping sets") {
+            val a = (1..20).toTreapSet()
+            val b = (10..30).toTreapSet()
+            mapOf("a" to a, "b" to b, "a - b" to (a - b), "b - a" to (b - a))
+        }
+    }
 }
