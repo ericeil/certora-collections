@@ -135,13 +135,14 @@ internal abstract class Treap<@Treapable T, S : Treap<T, S>>(
         case any hash functions have changed since this Treap was serialized.
      */
     protected fun readResolve(): Any? {
+        fun Treap<T, S>.formatKey() = treapKey?.let { "${it::class.java}:${it}" } ?: "null"
         if (left != null) {
-            check(left.compareKeyTo(this) < 0) { "Treap key comparison logic changed: ${left.treapKey} >= ${this.treapKey}" }
-            check(left.comparePriorityTo(this) < 0) { "Treap key priority hash logic changed: ${left.treapKey} >= ${this.treapKey} "}
+            check(left.compareKeyTo(this) < 0) { "Treap key comparison logic changed: ${left.formatKey()} >= ${this.formatKey()}" }
+            check(left.comparePriorityTo(this) < 0) { "Treap key priority hash logic changed: ${left.formatKey()} >= ${this.formatKey()} "}
         }
         if (right != null) {
-            check(right.compareKeyTo(this) > 0) { "Treap key comparison logic changed: ${right.treapKey} <= ${this.treapKey}" }
-            check(right.comparePriorityTo(this) < 0) { "Treap key priority hash logic changed: ${right.treapKey} >= ${this.treapKey} "}
+            check(right.compareKeyTo(this) > 0) { "Treap key comparison logic changed: ${right.formatKey()} <= ${this.formatKey()}" }
+            check(right.comparePriorityTo(this) < 0) { "Treap key priority hash logic changed: ${right.formatKey()} >= ${this.formatKey()} "}
         }
         return this
     }
