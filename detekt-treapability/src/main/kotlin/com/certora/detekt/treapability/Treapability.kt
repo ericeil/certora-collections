@@ -29,7 +29,7 @@ class Treapability(config: Config) : Rule(config) {
     )
 
     /**
-        If a concrete class implements a "treapable" interface, verify that it does have a stable 'hashCode' 
+        If a concrete class implements a "treapable" interface, verify that it does have a stable 'hashCode'
         implementation.
      */
     override fun visitClassOrObject(clazz: KtClassOrObject) {
@@ -69,7 +69,7 @@ class Treapability(config: Config) : Rule(config) {
                 if (hashCodeFunc == null) {
                     val message =
                         "'${desc.name}' does not have a stable hash code." +
-                        if (desc.isObject) { " Add 'override fun hashCode() = utils.treapHashObject(this)'." }
+                        if (desc.isObject) { " Add 'override fun hashCode() = treapHashObject(this)'." }
                         else { " Add 'override fun hashCode(): Int'." }
                     report(CodeSmell(issue, Entity.from(clazz), message))
                 } else {
@@ -88,7 +88,7 @@ class Treapability(config: Config) : Rule(config) {
 
                         ...but we allow this:
 
-                            ```                     
+                            ```
                             class C(i: Int, e: E) {
                                 override fun hashCode() = treapHash { it + i + e } // e is passed to 'TreapHashCode.plus'
                             }
@@ -198,10 +198,10 @@ class Treapability(config: Config) : Rule(config) {
         private val hashCodePlusName = FqName("com.certora.collect.TreapableHashCode.plus")
         val treapableAnnotationName = FqName("com.certora.collect.Treapable")
 
-        val Annotated.hasTreapableAnnotation: Boolean get() = 
+        val Annotated.hasTreapableAnnotation: Boolean get() =
             annotations.firstOrNull { it.fqName == treapableAnnotationName } != null
 
-        val ClassDescriptor.isAnnotatedTreapable get() = 
+        val ClassDescriptor.isAnnotatedTreapable get() =
             getAllSuperClassifiers().any { it.hasTreapableAnnotation }
 
 
