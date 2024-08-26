@@ -17,6 +17,16 @@ internal class SortedTreapSet<@Treapable E : Comparable<E>>(
     override fun E.toTreapKey() = TreapKey.Sorted.FromKey(this)
     override fun new(element: E): SortedTreapSet<E> = SortedTreapSet(element)
 
+    private fun writeObject(s: java.io.ObjectOutputStream) {
+        s.defaultWriteObject()
+        writeSerializationDiagnostics(s)
+    }
+
+    private fun readObject(s: java.io.ObjectInputStream) {
+        s.defaultReadObject()
+        readSerializationDiagnostics(s)
+    }
+
     override fun add(element: E): TreapSet<E> = when {
         element is PrefersHashTreap -> HashTreapSet(element as E) + this
         else -> self.add(new(element))

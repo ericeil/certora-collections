@@ -24,6 +24,16 @@ internal class HashTreapMap<@Treapable K, V>(
     override fun K.toTreapKey() = TreapKey.Hashed.FromKey(this)
     override fun new(key: K, value: V): HashTreapMap<K, V> = HashTreapMap(key, value)
 
+    private fun writeObject(s: java.io.ObjectOutputStream) {
+        s.defaultWriteObject()
+        writeSerializationDiagnostics(s)
+    }
+
+    private fun readObject(s: java.io.ObjectInputStream) {
+        s.defaultReadObject()
+        readSerializationDiagnostics(s)
+    }
+
     @Suppress("UNCHECKED_CAST")
     override fun Map<out K, V>.toTreapMapOrNull() =
         this as? HashTreapMap<K, V>

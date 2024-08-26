@@ -20,6 +20,16 @@ internal class HashTreapSet<@Treapable E>(
     override fun E.toTreapKey() = TreapKey.Hashed.FromKey(this)
     override fun new(element: E): HashTreapSet<E> = HashTreapSet(element)
 
+    private fun writeObject(s: java.io.ObjectOutputStream) {
+        s.defaultWriteObject()
+        writeSerializationDiagnostics(s)
+    }
+
+    private fun readObject(s: java.io.ObjectInputStream) {
+        s.defaultReadObject()
+        readSerializationDiagnostics(s)
+    }
+
     override fun add(element: E): TreapSet<E> = self.add(new(element))
 
     override fun Iterable<E>.toTreapSetOrNull(): HashTreapSet<E>? =
@@ -45,7 +55,7 @@ internal class HashTreapSet<@Treapable E>(
         return count
     }
 
-    override fun copyWith(left: HashTreapSet<E>?, right: HashTreapSet<E>?): HashTreapSet<E> = 
+    override fun copyWith(left: HashTreapSet<E>?, right: HashTreapSet<E>?): HashTreapSet<E> =
         HashTreapSet(element, next, left, right)
 
     fun withElement(element: E) = when {

@@ -19,6 +19,16 @@ internal class SortedTreapMap<@Treapable K : Comparable<K>, V>(
 
     override fun new(key: K, value: V): SortedTreapMap<K, V> = SortedTreapMap(key, value)
 
+    private fun writeObject(s: java.io.ObjectOutputStream) {
+        s.defaultWriteObject()
+        writeSerializationDiagnostics(s)
+    }
+
+    private fun readObject(s: java.io.ObjectInputStream) {
+        s.defaultReadObject()
+        readSerializationDiagnostics(s)
+    }
+
     @Suppress("UNCHECKED_CAST")
     override fun Map<out K, V>.toTreapMapOrNull() =
         this as? SortedTreapMap<K, V>

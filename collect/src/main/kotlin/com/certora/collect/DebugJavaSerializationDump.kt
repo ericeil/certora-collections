@@ -1,4 +1,4 @@
-package utils
+package com.certora.collect
 
 import java.io.*
 import java.nio.file.*
@@ -16,7 +16,7 @@ import java.util.*
         --add-opens java.base/java.util=ALL-UNNAMED
     ```
  */
-public fun debugJavaSerializationDump(obj: Serializable, path: Path, append: Boolean = false) {
+internal fun debugJavaSerializationDump(obj: Serializable, path: Path, append: Boolean = false) {
     Files.newBufferedWriter(
         path,
         StandardOpenOption.CREATE,
@@ -26,6 +26,14 @@ public fun debugJavaSerializationDump(obj: Serializable, path: Path, append: Boo
             oos.writeObject(obj)
         }
     }
+}
+
+internal fun debugJavaSerializationDump(obj: Serializable) : String {
+    val writer = StringWriter()
+    DebugObjectOutputStream(writer).use { oos ->
+        oos.writeObject(obj)
+    }
+    return writer.toString()
 }
 
 private fun ByteArray.toHexString(): String =
@@ -85,31 +93,33 @@ private class DebugObjectOutputStream(private val writer: Appendable) : ObjectOu
         }
     }
 
+    private fun Any.hc() = "{${hashCode().toUInt().toString(16)}}"
+
     private fun writeNewObject(obj: Any) {
         val handle = nextHandle++
         handles[obj] = handle
 
         when (obj) {
-            is String -> writeln("String $obj @$handle")
-            is Byte -> writeln("Byte $obj @$handle")
-            is Short -> writeln("Short $obj @$handle")
-            is Int -> writeln("Int $obj @$handle")
-            is Long -> writeln("Long $obj @$handle")
-            is Float -> writeln("Float $obj @$handle")
-            is Double -> writeln("Double $obj @$handle")
-            is Char -> writeln("Char $obj @$handle")
-            is Boolean -> writeln("Boolean $obj @$handle")
-            is Enum<*> -> writeln("Enum ${obj.javaClass.name}.${obj.name} @$handle")
-            is Class<*> -> writeln("class ${obj.name} @$handle")
-            is ByteArray -> writeln(obj.joinToString(",", "ByteArray [", "] @$handle") { it.toHexString() })
-            is ShortArray -> writeln(obj.joinToString(",", "ShortArray [", "] @$handle"))
-            is IntArray -> writeln(obj.joinToString(",", "IntArray [", "] @$handle"))
-            is LongArray -> writeln(obj.joinToString(",", "LongArray [", "] @$handle"))
-            is FloatArray -> writeln(obj.joinToString(",", "FloatArray [", "] @$handle"))
-            is DoubleArray -> writeln(obj.joinToString(",", "DoubleArray [", "] @$handle"))
-            is CharArray -> writeln(obj.joinToString(",", "CharArray [", "] @$handle"))
-            is BooleanArray -> writeln(obj.joinToString(",", "BooleanArray [", "] @$handle"))
-            is Array<*> -> nest("${obj.javaClass.name} @$handle %${obj.hashCode().toString(16)}") { obj.forEach { writeObject(it) } }
+            is String -> writeln("String $obj @$handle ${obj.hc()}")
+            is Byte -> writeln("Byte $obj @$handle ${obj.hc()}")
+            is Short -> writeln("Short $obj @$handle ${obj.hc()}")
+            is Int -> writeln("Int $obj @$handle ${obj.hc()}")
+            is Long -> writeln("Long $obj @$handle ${obj.hc()}")
+            is Float -> writeln("Float $obj @$handle ${obj.hc()}")
+            is Double -> writeln("Double $obj @$handle ${obj.hc()}")
+            is Char -> writeln("Char $obj @$handle ${obj.hc()}")
+            is Boolean -> writeln("Boolean $obj @$handle ${obj.hc()}")
+            is Enum<*> -> writeln("Enum ${obj.javaClass.name}.${obj.name} @$handle ${obj.hc()}")
+            is Class<*> -> writeln("class ${obj.name} @$handle ${obj.hc()}")
+            is ByteArray -> writeln(obj.joinToString(",", "ByteArray [", "] @$handle ${obj.hc()}") { it.toHexString() })
+            is ShortArray -> writeln(obj.joinToString(",", "ShortArray [", "] @$handle ${obj.hc()}"))
+            is IntArray -> writeln(obj.joinToString(",", "IntArray [", "] @$handle ${obj.hc()}"))
+            is LongArray -> writeln(obj.joinToString(",", "LongArray [", "] @$handle ${obj.hc()}"))
+            is FloatArray -> writeln(obj.joinToString(",", "FloatArray [", "] @$handle ${obj.hc()}"))
+            is DoubleArray -> writeln(obj.joinToString(",", "DoubleArray [", "] @$handle ${obj.hc()}"))
+            is CharArray -> writeln(obj.joinToString(",", "CharArray [", "] @$handle ${obj.hc()}"))
+            is BooleanArray -> writeln(obj.joinToString(",", "BooleanArray [", "] @$handle ${obj.hc()}"))
+            is Array<*> -> nest("${obj.javaClass.name} @$handle ${obj.hc()}") { obj.forEach { writeObject(it) } }
             else -> {
                 obj.javaClass.getInheritableMethodOrNull("writeReplace")?.let { writeReplaceMethod ->
                     nest("writeReplace") { writeObject(writeReplaceMethod.invoke(obj)) }
@@ -121,7 +131,7 @@ private class DebugObjectOutputStream(private val writer: Appendable) : ObjectOu
     }
 
     private fun writeOrdinaryObject(handle: Int, obj: Any, clazz: Class<*>) {
-        nest("${clazz.name} @$handle %${obj.hashCode().toString(16)}") {
+        nest("${clazz.name} @$handle ${obj.hc()}") {
             clazz.getSuperclass()?.let {
                 if (Serializable::class.java.isAssignableFrom(it)) {
                     writeOrdinaryObject(handle, obj, it)

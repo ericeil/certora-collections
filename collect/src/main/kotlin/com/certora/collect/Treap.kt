@@ -1,5 +1,8 @@
 package com.certora.collect
 
+import java.io.*
+import java.nio.file.*
+
 /**
     Treaps are probabilistically balanced binary search trees.  We use these to implement efficient persistent Set and
     Map data structures.  For background reading, see:
@@ -68,7 +71,7 @@ package com.certora.collect
 internal abstract class Treap<@Treapable T, S : Treap<T, S>>(
     @JvmField val left: S?,
     @JvmField val right: S?
-) : TreapKey<T>, java.io.Serializable {
+) : TreapKey<T>, Serializable {
 
     abstract val self: S
 
@@ -129,32 +132,25 @@ internal abstract class Treap<@Treapable T, S : Treap<T, S>>(
 
     fun containsKey(key: TreapKey<T>): Boolean = (self.find(key) != null)
 
+    protected fun writeSerializationDiagnostics(s: ObjectOutputStream) {
+        s.writeInt(treapKey.hashCode())
+        s.writeUTF((treapKey as? java.io.Serializable)?.let { debugJavaSerializationDump(it) }.orEmpty())
+    }
 
-    /**
-        This gets called by the JVM deserializer, after deserialization.  It's our chance to validate our invariants, in
-        case any hash functions have changed since this Treap was serialized.
-     */
-    protected fun readResolve(): Any? {
-        fun Treap<T, S>.formatKey() = treapKey?.let { "${it::class.java}:${it}" } ?: "null"
-        try {
-            if (left != null) {
-                check(left.compareKeyTo(this) < 0) { "Treap key comparison logic changed: ${left.formatKey()} >= ${this.formatKey()}" }
-                check(left.comparePriorityTo(this) < 0) { "Treap key priority hash logic changed: ${left.formatKey()} >= ${this.formatKey()} "}
+    protected fun readSerializationDiagnostics(s: ObjectInputStream) {
+        val oldHash = s.readInt()
+        val oldDump = s.readUTF()
+
+        val newHash = treapKey.hashCode()
+        if (newHash != oldHash) {
+            (treapKey as? Serializable)?.let { treapKey ->
+                val newDump = debugJavaSerializationDump(treapKey)
+                val filename = "treap-deserialization-${oldHash.toString(16)}"
+                Files.writeString(Paths.get("$filename-old.txt"), oldDump)
+                Files.writeString(Paths.get("$filename-new.txt"), newDump)
             }
-            if (right != null) {
-                check(right.compareKeyTo(this) > 0) { "Treap key comparison logic changed: ${right.formatKey()} <= ${this.formatKey()}" }
-                check(right.comparePriorityTo(this) < 0) { "Treap key priority hash logic changed: ${right.formatKey()} >= ${this.formatKey()} "}
-            }
-        } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-            fun T?.dump(name: String) = (this as? java.io.Serializable)?.let {
-                utils.debugJavaSerializationDump(it, java.nio.file.Paths.get("treap-deserialization-error-$name.txt"))
-            }
-            treapKey.dump("this")
-            left?.treapKey.dump("left")
-            right?.treapKey.dump("right")
-            throw e;
+            error("Treap key hash code changed: $treapKey $newHash != $oldHash")
         }
-        return this
     }
 }
 
