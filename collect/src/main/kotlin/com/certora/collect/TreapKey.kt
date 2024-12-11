@@ -1,5 +1,16 @@
 package com.certora.collect
 
+// https://github.com/martinus/better-faster-stronger-mixer
+// https://github.com/martinus/better-faster-stronger-mixer/blob/master/include/mixer/mumxmumxx2.h
+// https://mostlymangling.blogspot.com/2019/01/better-stronger-mixer-and-test-procedure.html
+// https://github.com/vnmakarov/mum-hash
+@Suppress("nothing_to_inline")
+private inline fun <T> mul128(a: Long, b: Long, r: (h: Long, l: Long) -> T) = r(Math.multiplyHigh(a, b), a * b)
+@Suppress("nothing_to_inline")
+private inline fun mumx(a: Long, b: Long) = mul128(a, b) { h, l -> h xor l }
+@Suppress("nothing_to_inline")
+private inline fun mumxmumxx2(v: Long) = mumx(mumx(v, 0x2ca7aea0ebd71d49L), mumx(v, 0x9e49b5a3555f2295UL.toLong()));
+
 /**
     Provides properties and methods over Treap keys.  See `Treap` for an overview.  This is an interface rather than an
     abstract class so that it can be "mixed into" other classes with their own bases.
@@ -35,15 +46,7 @@ internal interface TreapKey<@Treapable K> {
     open val treapKeyHashCode: Int get() = treapKey.hashCode()
 
     open val treapPriority: Int get() {
-        // The goal is to produce a seemingly random number using the object's hash code as a seed.  We borrow the
-        // proven hash finalization mixing function from MurmurHash: https://en.wikipedia.org/wiki/MurmurHash
-        var h = treapKey.hashCode()
-        h = h xor (h ushr 16)
-        h = (h * 0x85ebca6b).toInt()
-        h = h xor (h ushr 13)
-        h = (h * 0xc2b2ae35).toInt()
-        h = h xor (h ushr 16)
-        return h
+        return mumxmumxx2(treapKey.hashCode().toLong()).toInt()
     }
 
     fun comparePriorityTo(that: TreapKey<K>) : Int {
