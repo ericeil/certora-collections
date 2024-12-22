@@ -139,14 +139,6 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
             override fun iterator() = entrySequence().iterator()
         }
 
-    override val keys: ImmutableSet<K>
-        get() = object: AbstractSet<K>(), ImmutableSet<K> {
-            override val size get() = this@AbstractTreapMap.size
-            override fun isEmpty() = this@AbstractTreapMap.isEmpty()
-            override operator fun contains(element: K) = containsKey(element)
-            override operator fun iterator() = entrySequence().map { it.key }.iterator()
-        }
-
     override val values: ImmutableCollection<V>
         get() = object: AbstractCollection<V>(), ImmutableCollection<V> {
             override val size get() = this@AbstractTreapMap.size

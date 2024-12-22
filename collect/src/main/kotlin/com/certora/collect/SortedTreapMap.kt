@@ -163,4 +163,6 @@ internal class SortedTreapMap<@Treapable K, V>(
         action(this.asEntry())
         right?.forEachEntry(action)
     }
+
+    override val keys: SortedTreapSet<K> get() = SortedTreapSet(key, left?.keys, right?.keys)
 }
