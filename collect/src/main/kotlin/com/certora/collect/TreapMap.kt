@@ -12,7 +12,6 @@ public sealed interface TreapMap<K, V> : PersistentMap<K, V> {
     override fun remove(key: K, value: @UnsafeVariance V): TreapMap<K, V>
     override fun putAll(m: Map<out K, @UnsafeVariance V>): TreapMap<K, V>
     override fun clear(): TreapMap<K, V>
-
     override val keys: TreapSet<K>
 
     /**
@@ -24,6 +23,16 @@ public sealed interface TreapMap<K, V> : PersistentMap<K, V> {
 
     @Suppress("Treapability")
     override fun builder(): Builder<K, @UnsafeVariance V> = TreapMapBuilder(this)
+
+    /**
+        If this map contains exactly one entry, returns that entry.  Otherwise, throws.
+     */
+    public fun single(): Map.Entry<K, V>
+
+    /**
+        If this map contains exactly one entry, returns that entry.  Otherwise, returns null
+     */
+    public fun singleOrNull(): Map.Entry<K, V>?
 
     /**
         Returns an arbitrary entry from the map, or null if the map is empty.

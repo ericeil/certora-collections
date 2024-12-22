@@ -6,7 +6,10 @@ import com.certora.forkjoin.*
     Base class for TreapSet implementations.  Provides the Set operations; derived classes deal with type-specific
     behavior such as hash collisions.  See `Treap` for an overview of all of this.
  */
-internal sealed class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S>> : TreapSet<E>, Treap<E, S>() {
+internal sealed class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S>>(
+    left: S?,
+    right: S?
+) : TreapSet<E>, Treap<E, S>(left, right) {
     /**
         Derived classes override to create an apropriate node containing the given element.
      */
@@ -52,8 +55,6 @@ internal sealed class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S>>
         Apply the action to each element in this node.
      */
     abstract fun shallowForEach(action: (element: E) -> Unit): Unit
-
-    abstract fun shallowGetSingleElement(): E?
 
     abstract infix fun shallowUnion(that: S): S
     abstract infix fun shallowIntersect(that: S): S?
@@ -133,25 +134,13 @@ internal sealed class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S>>
     override fun findEqual(element: E): E? =
         element.toTreapKey()?.let { self.find(it) }?.shallowFindEqual(element)
 
-    @Suppress("UNCHECKED_CAST")
-    override fun single(): E = getSingleElement() ?: when {
-        isEmpty() -> throw NoSuchElementException("Set is empty")
-        size > 1 -> throw IllegalArgumentException("Set has more than one element")
-        else -> null as E // The single element must have been null!
-    }
-
-    override fun singleOrNull(): E? = getSingleElement()
-
     override fun forEachElement(action: (element: E) -> Unit): Unit {
         left?.forEachElement(action)
         shallowForEach(action)
         right?.forEachElement(action)
     }
 
-    internal fun getSingleElement(): E? = when {
-        left === null && right === null -> shallowGetSingleElement()
-        else -> null
-    }
+    override fun single() = singleOrNull() ?: throw IllegalArgumentException("Set contains more than one element")
 
     override fun <R : Any> mapReduce(map: (E) -> R, reduce: (R, R) -> R): R =
         notForking(self) { mapReduceImpl(map, reduce) }
@@ -183,7 +172,7 @@ internal infix fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.treapUnion(that
     this == null -> that
     that == null -> this
     this === that -> this
-    that.getSingleElement() != null -> add(that)
+    that.singleOrNull() != null -> add(that)
     else -> {
         // remember, a.comparePriorityTo(b)==0 <=> a.compareKeyTo(b)==0
         val c = this.comparePriorityTo(that)

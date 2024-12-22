@@ -8,8 +8,12 @@ package com.certora.collect
     This is just a simple linked list, so operations on it are either O(N) or O(N^2), but collisions are assumed to be
     rare enough that these lists will be very small - usually just one element.
  */
-internal abstract class AbstractHashTreapSet<@Treapable E>
-    : AbstractTreapSet<E, AbstractHashTreapSet<E>>(), TreapKey.Hashed<E>, ElementList<E> {
+internal class HashTreapSet<@Treapable E>(
+    override val element: E,
+    override val next: ElementList.More<E>? = null,
+    left: HashTreapSet<E>? = null,
+    right: HashTreapSet<E>? = null
+) : AbstractTreapSet<E, HashTreapSet<E>>(left, right), TreapKey.Hashed<E>, ElementList<E> {
 
     override fun hashCode(): Int = computeHashCode()
 
@@ -21,6 +25,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
     override fun Iterable<E>.toTreapSetOrNull(): HashTreapSet<E>? =
         (this as? HashTreapSet<E>)
         ?: (this as? TreapSet.Builder<E>)?.build() as? HashTreapSet<E>
+        ?: (this as? HashTreapMap.KeySet<E>)?.keys?.value
 
     private inline fun ElementList<E>?.forEachNodeElement(action: (E) -> Unit) {
         var current = this
@@ -41,7 +46,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
         return count
     }
 
-    override fun copyWith(left: AbstractHashTreapSet<E>?, right: AbstractHashTreapSet<E>?) =
+    override fun copyWith(left: HashTreapSet<E>?, right: HashTreapSet<E>?): HashTreapSet<E> =
         HashTreapSet(element, next, left, right)
 
     fun withElement(element: E) = when {
@@ -49,7 +54,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
         else -> HashTreapSet(this.element, ElementList.More(element, this.next), this.left, this.right)
     }
 
-    override fun shallowEquals(that: AbstractHashTreapSet<E>): Boolean {
+    override fun shallowEquals(that: HashTreapSet<E>): Boolean {
         forEachNodeElement {
             if (!that.shallowContains(it)) {
                 return false
@@ -80,7 +85,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
         return false
     }
 
-    override fun shallowContainsAll(elements: AbstractHashTreapSet<E>): Boolean {
+    override fun shallowContainsAll(elements: HashTreapSet<E>): Boolean {
         elements.forEachNodeElement {
             if (!this.shallowContains(it)) {
                 return false
@@ -89,7 +94,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
         return true
     }
 
-    override fun shallowContainsAny(elements: AbstractHashTreapSet<E>): Boolean {
+    override fun shallowContainsAny(elements: HashTreapSet<E>): Boolean {
         elements.forEachNodeElement {
             if (this.shallowContains(it)) {
                 return true
@@ -98,13 +103,13 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
         return false
     }
 
-    override fun shallowAdd(that: AbstractHashTreapSet<E>): AbstractHashTreapSet<E> {
+    override fun shallowAdd(that: HashTreapSet<E>): HashTreapSet<E> {
         // add is only called with a single element
         check (that.next == null) { "add with multiple elements?" }
         return this.withElement(that.element)
     }
 
-    override fun shallowUnion(that: AbstractHashTreapSet<E>): AbstractHashTreapSet<E> {
+    override fun shallowUnion(that: HashTreapSet<E>): HashTreapSet<E> {
         var result = this
         that.forEachNodeElement {
             result = result.withElement(it)
@@ -112,7 +117,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
         return result
     }
 
-    override fun shallowDifference(that: AbstractHashTreapSet<E>): AbstractHashTreapSet<E>? {
+    override fun shallowDifference(that: HashTreapSet<E>): HashTreapSet<E>? {
         // Fast path for the most common case
         if (this.next == null) {
             if (that.shallowContains(this.element)) {
@@ -122,7 +127,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
             }
         }
 
-        var result: AbstractHashTreapSet<E>? = null
+        var result: HashTreapSet<E>? = null
         var changed = false
         this.forEachNodeElement {
             if (!that.shallowContains(it)) {
@@ -139,7 +144,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
         }
     }
 
-    override fun shallowIntersect(that: AbstractHashTreapSet<E>): AbstractHashTreapSet<E>? {
+    override fun shallowIntersect(that: HashTreapSet<E>): HashTreapSet<E>? {
         // Fast path for the most common case
         if (this.next == null) {
             if (that.shallowContains(this.element)) {
@@ -149,7 +154,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
             }
         }
 
-        var result: AbstractHashTreapSet<E>? = null
+        var result: HashTreapSet<E>? = null
         var changed = false
         this.forEachNodeElement {
             if (that.shallowContains(it)) {
@@ -166,7 +171,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
         }
     }
 
-    override fun shallowRemove(element: E): AbstractHashTreapSet<E>? {
+    override fun shallowRemove(element: E): HashTreapSet<E>? {
         // Fast path for the most common case
         if (this.next == null) {
             if (this.element == element) {
@@ -176,7 +181,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
             }
         }
 
-        var result: AbstractHashTreapSet<E>? = null
+        var result: HashTreapSet<E>? = null
         var changed = false
         this.forEachNodeElement {
             if (it != element) {
@@ -193,8 +198,8 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
         }
     }
 
-    override fun shallowRemoveAll(predicate: (E) -> Boolean): AbstractHashTreapSet<E>? {
-        var result: AbstractHashTreapSet<E>? = null
+    override fun shallowRemoveAll(predicate: (E) -> Boolean): HashTreapSet<E>? {
+        var result: HashTreapSet<E>? = null
         var removed = false
         this.forEachNodeElement {
             if (predicate(it)) {
@@ -224,8 +229,7 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
         }
     }.iterator()
 
-    override fun shallowGetSingleElement(): E? = element.takeIf { next == null }
-
+    override fun singleOrNull(): E? = element.takeIf { next == null && left == null && right == null }
     override fun arbitraryOrNull(): E? = element
 
     override fun <R : Any> shallowMapReduce(map: (E) -> R, reduce: (R, R) -> R): R {
@@ -249,17 +253,10 @@ internal abstract class AbstractHashTreapSet<@Treapable E>
 
 internal interface ElementList<E> {
     val element: E
-    val next: ElementList<E>?
+    val next: More<E>?
 
     class More<E>(
         override val element: E,
-        override val next: ElementList<E>?
+        override val next: More<E>?
     ) : ElementList<E>, java.io.Serializable
 }
-
-internal class HashTreapSet<@Treapable E>(
-    override val element: E,
-    override val next: ElementList<E>? = null,
-    override val left: AbstractHashTreapSet<E>? = null,
-    override val right: AbstractHashTreapSet<E>? = null
-) : AbstractHashTreapSet<E>()

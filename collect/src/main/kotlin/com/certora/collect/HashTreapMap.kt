@@ -15,9 +15,9 @@ internal class HashTreapMap<@Treapable K, V>(
     override val key: K,
     override val value: V,
     override val next: KeyValuePairList.More<K, V>? = null,
-    override val left: HashTreapMap<K, V>? = null,
-    override val right: HashTreapMap<K, V>? = null
-) : AbstractTreapMap<K, V, HashTreapMap<K, V>>(), TreapKey.Hashed<K>, KeyValuePairList<K, V> {
+    left: HashTreapMap<K, V>? = null,
+    right: HashTreapMap<K, V>? = null
+) : AbstractTreapMap<K, V, HashTreapMap<K, V>>(left, right), TreapKey.Hashed<K>, KeyValuePairList<K, V> {
 
     override fun hashCode() = computeHashCode()
 
@@ -31,6 +31,7 @@ internal class HashTreapMap<@Treapable K, V>(
         this as? HashTreapMap<K, V>
         ?: (this as? PersistentMap.Builder<K, V>)?.build() as? HashTreapMap<K, V>
 
+    override fun singleOrNull() = MapEntry(key, value).takeIf { next == null && left == null && right == null }
     override fun arbitraryOrNull(): Map.Entry<K, V>? = MapEntry(key, value)
 
     override fun getShallowMerger(merger: (K, V?, V?) -> V?): (HashTreapMap<K, V>?, HashTreapMap<K, V>?) -> HashTreapMap<K, V>? = { t1, t2 ->
@@ -351,31 +352,25 @@ internal class HashTreapMap<@Treapable K, V>(
         right?.forEachEntry(action)
     }
 
-    override val keys get() = KeySet(this)
+    private fun treapSetFromKeys(): HashTreapSet<K> =
+        HashTreapSet(treapKey, next?.toKeyList(), left?.treapSetFromKeys(), right?.treapSetFromKeys())
 
     class KeySet<@Treapable K>(
-        private val map: HashTreapMap<K, *>
-    ) : AbstractHashTreapSet<K>() {
-        override fun hashCode() = super.hashCode()
+        override val map: HashTreapMap<K, *>,
+        override val keys: Lazy<HashTreapSet<K>> = lazy { map.treapSetFromKeys() }
+    ) : AbstractKeySet<K, HashTreapSet<K>>()
 
-        override val element get() = map.key
-        override val left get() = map.left?.keys
-        override val right get() = map.right?.keys
-        override val next get() = map.next?.let { More(it) }
-
-        class More<K>(val mapMore: KeyValuePairList.More<K, *>) : ElementList<K>, java.io.Serializable {
-            override val element get() = mapMore.key
-            override val next get() = mapMore.next?.let { More(it) }
-        }
-    }
+    override val keys get() = KeySet(this)
 }
 
 internal interface KeyValuePairList<K, V> {
     abstract val key: K
     abstract val value: V
-    abstract val next: KeyValuePairList<K, V>?
+    abstract val next: More<K, V>?
     operator fun component1() = key
     operator fun component2() = value
+
+    fun toKeyList(): ElementList.More<K> = ElementList.More(key, next?.toKeyList())
 
     class More<K, V>(
         override val key: K,
