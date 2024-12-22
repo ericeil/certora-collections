@@ -13,8 +13,6 @@ public sealed interface TreapMap<K, V> : PersistentMap<K, V> {
     override fun putAll(m: Map<out K, @UnsafeVariance V>): TreapMap<K, V>
     override fun clear(): TreapMap<K, V>
 
-    override val keys: TreapSet<K>
-
     /**
         A [PersistentMap.Builder] that produces a [TreapMap].
     */
