@@ -350,8 +350,6 @@ internal class HashTreapMap<@Treapable K, V>(
         forEachPair { (k, v) -> action(MapEntry(k, v)) }
         right?.forEachEntry(action)
     }
-
-    override val keys: HashTreapSet<K> get() = HashTreapSet(key, next?.toKeyList(), left?.keys, right?.keys)
 }
 
 internal interface KeyValuePairList<K, V> {
@@ -360,8 +358,6 @@ internal interface KeyValuePairList<K, V> {
     abstract val next: More<K, V>?
     operator fun component1() = key
     operator fun component2() = value
-
-    fun toKeyList(): ElementList.More<K> = ElementList.More(key, next?.toKeyList())
 
     class More<K, V>(
         override val key: K,
