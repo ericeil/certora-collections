@@ -83,6 +83,7 @@ internal sealed class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S>>
         other == null -> false
         this === other -> true
         other !is Set<*> -> false
+        other.isEmpty() -> false
         else -> (other as Set<E>).useAsTreap(
             { otherTreap -> this.self.deepEquals(otherTreap) },
             { this.size == other.size && this.containsAll(other) }

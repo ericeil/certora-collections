@@ -101,6 +101,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
         return when {
             otherMap == null -> false
             otherMap === this -> true
+            otherMap.isEmpty() -> false
             else -> otherMap.useAsTreap(
                 { otherTreap -> this.self.deepEquals(otherTreap) },
                 { other.size == this.size && other.entries.all { this.containsEntry(it) }}
