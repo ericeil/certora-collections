@@ -355,6 +355,7 @@ internal class HashTreapMap<@Treapable K, V>(
     private fun treapSetFromKeys(): HashTreapSet<K> =
         HashTreapSet(treapKey, next?.toKeyList(), left?.treapSetFromKeys(), right?.treapSetFromKeys())
 
+    @Suppress("Treapability")
     class KeySet<@Treapable K>(
         override val map: HashTreapMap<K, *>,
         override val keys: Lazy<HashTreapSet<K>> = lazy { map.treapSetFromKeys() }
