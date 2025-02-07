@@ -354,10 +354,10 @@ internal class HashTreapMap<@Treapable K, V>(
         return result!!
     }
 
-    override fun forEachEntry(action: (Map.Entry<K, V>) -> Unit) {
-        left?.forEachEntry(action)
-        forEachPair { (k, v) -> action(MapEntry(k, v)) }
-        right?.forEachEntry(action)
+    override fun forEachKeyAndValue(action: (K, V) -> Unit) {
+        left?.forEachKeyAndValue(action)
+        forEachPair { (k, v) -> action(k, v) }
+        right?.forEachKeyAndValue(action)
     }
 
     private fun treapSetFromKeys(): HashTreapSet<K> =
