@@ -33,7 +33,7 @@ internal class HashTreapMap<@Treapable K, V>(
         ?: (this as? PersistentMap.Builder<K, V>)?.build() as? HashTreapMap<K, V>
 
     override fun singleOrNull() = MapEntry(key, value).takeIf { next == null && left == null && right == null }
-    override fun arbitraryOrNull(): MapEntry<K, V>? = MapEntry(key, value)
+    override fun arbitraryOrNull(): Map.Entry<K, V>? = MapEntry(key, value)
 
     override fun getShallowMerger(
         mode: MergeMode,
@@ -168,7 +168,7 @@ internal class HashTreapMap<@Treapable K, V>(
 
     override fun copyWith(left: HashTreapMap<K, V>?, right: HashTreapMap<K, V>?): HashTreapMap<K, V> = HashTreapMap(key, value, next, left, right)
 
-    override fun shallowEntrySequence(): Sequence<MapEntry<K, V>> = sequence {
+    override fun shallowEntrySequence(): Sequence<Map.Entry<K, V>> = sequence {
         forEachPair { (k, v) ->
             yield (MapEntry(k, v))
         }
@@ -354,7 +354,7 @@ internal class HashTreapMap<@Treapable K, V>(
         return result!!
     }
 
-    override fun forEachEntry(action: (MapEntry<K, V>) -> Unit) {
+    override fun forEachEntry(action: (Map.Entry<K, V>) -> Unit) {
         left?.forEachEntry(action)
         forEachPair { (k, v) -> action(MapEntry(k, v)) }
         right?.forEachEntry(action)

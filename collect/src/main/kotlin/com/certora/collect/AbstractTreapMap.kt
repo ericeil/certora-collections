@@ -43,7 +43,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
     /**
         Gets a sequence of map entries just in this Treap node.
      */
-    abstract fun shallowEntrySequence(): Sequence<MapEntry<K, V>>
+    abstract fun shallowEntrySequence(): Sequence<Map.Entry<K, V>>
 
     /**
         Converts the supplied map key to a TreapKey appropriate to this type of AbstractTreapMap (sorted vs. hashed)
@@ -92,7 +92,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
 
     override fun toString(): String = entries.joinToString(", ", "{", "}") { toString(it) }
 
-    private fun toString(entry: MapEntry<K, V>): String = toString(entry.key) + "=" + toString(entry.value)
+    private fun toString(entry: Map.Entry<K, V>): String = toString(entry.key) + "=" + toString(entry.value)
 
     private fun toString(o: Any?): String = if (o === this) { "(this Map)" } else { o.toString() }
 
@@ -137,8 +137,8 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
 
     override fun builder(): TreapMapBuilder<K, V> = TreapMapBuilder(self)
 
-    override val entries: ImmutableSet<MapEntry<K, V>>
-        get() = object : AbstractSet<MapEntry<K, V>>(), ImmutableSet<MapEntry<K, V>> {
+    override val entries: ImmutableSet<Map.Entry<K, V>>
+        get() = object : AbstractSet<Map.Entry<K, V>>(), ImmutableSet<Map.Entry<K, V>> {
             override val size get() = this@AbstractTreapMap.size
             override fun isEmpty() = this@AbstractTreapMap.isEmpty()
             override fun iterator() = entrySequence().iterator()
