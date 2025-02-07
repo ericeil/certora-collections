@@ -27,24 +27,24 @@ public sealed interface TreapMap<K, V> : PersistentMap<K, V> {
     /**
         If this map contains exactly one entry, returns that entry.  Otherwise, throws.
      */
-    public fun single(): Map.Entry<K, V>
+    public fun single(): MapEntry<K, V>
 
     /**
         If this map contains exactly one entry, returns that entry.  Otherwise, returns null
      */
-    public fun singleOrNull(): Map.Entry<K, V>?
+    public fun singleOrNull(): MapEntry<K, V>?
 
     /**
         Returns an arbitrary entry from the map, or null if the map is empty.
      */
-    public fun arbitraryOrNull(): Map.Entry<K, V>?
+    public fun arbitraryOrNull(): MapEntry<K, V>?
 
     /**
         Calls [action] for each entry in the map.
 
         Traverses the treap without allocating temporary storage, which may be more efficient than `entries.forEach`.
      */
-    public fun forEachEntry(action: (Map.Entry<K, V>) -> Unit): Unit
+    public fun forEachEntry(action: (MapEntry<K, V>) -> Unit): Unit
 
     /**
         Produces a new map containing the keys from this map and another map [m].
@@ -304,7 +304,7 @@ public operator fun <K, V> TreapMap<out K, V>.minus(keys: Iterable<K>): TreapMap
 public operator fun <K, V> TreapMap<out K, V>.minus(keys: Array<out K>): TreapMap<K, V> = removeAll(keys)
 public operator fun <K, V> TreapMap<out K, V>.minus(keys: Sequence<K>): TreapMap<K, V> = removeAll(keys)
 
-public fun <K, V : Any> TreapMap<K, V>.retainAll(predicate: (Map.Entry<K, V>) -> Boolean): TreapMap<K, V> =
+public fun <K, V : Any> TreapMap<K, V>.retainAll(predicate: (MapEntry<K, V>) -> Boolean): TreapMap<K, V> =
     this.updateValues { k, v -> if (predicate(MapEntry(k, v))) { v } else { null } }
 
 public fun <K, V : Any> TreapMap<K, V>.retainAllKeys(predicate: (K) -> Boolean): TreapMap<K, V> =
@@ -322,7 +322,7 @@ public fun <K, V> TreapMap<out K, V>.removeAll(keys: Array<out K>): TreapMap<K, 
 public fun <K, V> TreapMap<out K, V>.removeAll(keys: Sequence<K>): TreapMap<K, V> =
     mutate { it.minusAssign(keys) }
 
-public fun <K, V : Any> TreapMap<K, V>.removeAll(predicate: (Map.Entry<K, V>) -> Boolean): TreapMap<K, V> =
+public fun <K, V : Any> TreapMap<K, V>.removeAll(predicate: (MapEntry<K, V>) -> Boolean): TreapMap<K, V> =
     this.retainAll { !predicate(it) }
 
 public fun <K, V : Any> TreapMap<K, V>.removeAllKeys(predicate: (K) -> Boolean): TreapMap<K, V> =
@@ -341,7 +341,7 @@ public inline fun <@Treapable K, V, R> TreapMap<out K, V>.mapValues(transform: (
     Returns a key-value mapping associated with the greatest key less than or equal to the given key, or null if there
     is no such key.
  */
-public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.floorEntry(key: K): Map.Entry<K, V>? = when (this) {
+public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.floorEntry(key: K): MapEntry<K, V>? = when (this) {
     is EmptyTreapMap<K, V> -> null
     is SortedTreapMap<K, V> -> floorEntry(key)
     // Shouldn't happen due to static Comparable constraint on K
@@ -357,7 +357,7 @@ public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.floorKey(key: K): K?
     Returns a key-value mapping associated with the least key greater than or equal to the given key, or null if there
     is no such key.
  */
-public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.ceilingEntry(key: K): Map.Entry<K, V>? = when (this) {
+public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.ceilingEntry(key: K): MapEntry<K, V>? = when (this) {
     is EmptyTreapMap<K, V> -> null
     is SortedTreapMap<K, V> -> ceilingEntry(key)
     // Shouldn't happen due to static Comparable constraint on K
@@ -373,7 +373,7 @@ public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.ceilingKey(key: K): 
     Returns a key-value mapping associated with the greatest key strictly less than the given key, or null if there is
     no such key.
  */
-public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.lowerEntry(key: K): Map.Entry<K, V>? = when (this) {
+public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.lowerEntry(key: K): MapEntry<K, V>? = when (this) {
     is EmptyTreapMap<K, V> -> null
     is SortedTreapMap<K, V> -> lowerEntry(key)
     // Shouldn't happen due to static Comparable constraint on K
@@ -390,7 +390,7 @@ public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.lowerKey(key: K): K?
     Returns a key-value mapping associated with the least key strictly greater than the given key, or null if there is no
     such key.
  */
-public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.higherEntry(key: K): Map.Entry<K, V>? = when (this) {
+public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.higherEntry(key: K): MapEntry<K, V>? = when (this) {
     is EmptyTreapMap<K, V> -> null
     is SortedTreapMap<K, V> -> higherEntry(key)
     // Shouldn't happen due to static Comparable constraint on K
@@ -405,7 +405,7 @@ public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.higherKey(key: K): K
 /**
     Returns a key-value mapping associated with the least key in this map, or null if the map is empty.
  */
-public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.firstEntry(): Map.Entry<K, V>? = when (this) {
+public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.firstEntry(): MapEntry<K, V>? = when (this) {
     is EmptyTreapMap<K, V> -> null
     is SortedTreapMap<K, V> -> firstEntry()
     // Shouldn't happen due to static Comparable constraint on K
@@ -421,7 +421,7 @@ public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.firstKey(): K? = fir
 /**
     Returns a key-value mapping associated with the greatest key in this map, or null if the map is empty.
  */
-public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.lastEntry(): Map.Entry<K, V>? = when (this) {
+public fun <@Treapable K : Comparable<K>, V> TreapMap<K, V>.lastEntry(): MapEntry<K, V>? = when (this) {
     is EmptyTreapMap<K, V> -> null
     is SortedTreapMap<K, V> -> lastEntry()
     // Shouldn't happen due to static Comparable constraint on K

@@ -32,8 +32,8 @@ internal class SortedTreapMap<@Treapable K, V>(
         this as? SortedTreapMap<K, V>
         ?: (this as? PersistentMap.Builder<K, V>)?.build() as? SortedTreapMap<K, V>
 
-    override fun singleOrNull(): Map.Entry<K, V>? = MapEntry(key, value).takeIf { left == null && right == null }
-    override fun arbitraryOrNull(): Map.Entry<K, V>? = MapEntry(key, value)
+    override fun singleOrNull(): MapEntry<K, V>? = MapEntry(key, value).takeIf { left == null && right == null }
+    override fun arbitraryOrNull(): MapEntry<K, V>? = MapEntry(key, value)
 
     override fun getShallowUnionMerger(
         merger: (K, V, V) -> V
@@ -83,9 +83,9 @@ internal class SortedTreapMap<@Treapable K, V>(
     override val self get() = this
     override val treapKey get() = key
 
-    fun asEntry(): Map.Entry<K, V> = MapEntry(key, value)
+    fun asEntry(): MapEntry<K, V> = MapEntry(key, value)
 
-    override fun shallowEntrySequence(): Sequence<Map.Entry<K, V>> = sequenceOf(MapEntry(key, value))
+    override fun shallowEntrySequence(): Sequence<MapEntry<K, V>> = sequenceOf(MapEntry(key, value))
 
     override fun shallowContainsKey(key: K) = true
     override val shallowSize get() = 1
@@ -123,7 +123,7 @@ internal class SortedTreapMap<@Treapable K, V>(
         }
     }
 
-    fun floorEntry(key: K): Map.Entry<K, V>? {
+    fun floorEntry(key: K): MapEntry<K, V>? {
         val cmp = TreapKey.Sorted.fromKey(key)?.compareKeyTo(this)
         return when {
             cmp == null -> null
@@ -133,7 +133,7 @@ internal class SortedTreapMap<@Treapable K, V>(
         }
     }
 
-    fun ceilingEntry(key: K): Map.Entry<K, V>? {
+    fun ceilingEntry(key: K): MapEntry<K, V>? {
         val cmp = TreapKey.Sorted.fromKey(key)?.compareKeyTo(this)
         return when {
             cmp == null -> null
@@ -143,7 +143,7 @@ internal class SortedTreapMap<@Treapable K, V>(
         }
     }
 
-    fun lowerEntry(key: K): Map.Entry<K, V>? {
+    fun lowerEntry(key: K): MapEntry<K, V>? {
         val cmp = TreapKey.Sorted.fromKey(key)?.compareKeyTo(this)
         return when {
             cmp == null -> null
@@ -152,7 +152,7 @@ internal class SortedTreapMap<@Treapable K, V>(
         }
     }
 
-    fun higherEntry(key: K): Map.Entry<K, V>? {
+    fun higherEntry(key: K): MapEntry<K, V>? {
         val cmp = TreapKey.Sorted.fromKey(key)?.compareKeyTo(this)
         return when {
             cmp == null -> null
@@ -161,12 +161,12 @@ internal class SortedTreapMap<@Treapable K, V>(
         }
     }
 
-    fun firstEntry(): Map.Entry<K, V>? = left?.firstEntry() ?: this.asEntry()
-    fun lastEntry(): Map.Entry<K, V>? = right?.lastEntry() ?: this.asEntry()
+    fun firstEntry(): MapEntry<K, V>? = left?.firstEntry() ?: this.asEntry()
+    fun lastEntry(): MapEntry<K, V>? = right?.lastEntry() ?: this.asEntry()
 
     override fun <R : Any> shallowMapReduce(map: (K, V) -> R, reduce: (R, R) -> R): R = map(key, value)
 
-    override fun forEachEntry(action: (Map.Entry<K, V>) -> Unit) {
+    override fun forEachEntry(action: (MapEntry<K, V>) -> Unit) {
         left?.forEachEntry(action)
         action(this.asEntry())
         right?.forEachEntry(action)

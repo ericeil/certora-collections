@@ -90,10 +90,14 @@ public inline fun <R> notForking(f: context(Forker)() -> R): R = f(Forker.NotFor
 
     See See [datasturctures.treap.AbstractTreapMap.parallelUpdateValues] for a usage example.
  */
-public open class ThresholdForker<in T> @PublishedApi internal constructor(
-    @PublishedApi internal val threshold: (T) -> Boolean
-) {
-    @PublishedApi internal object NotForking : ThresholdForker<Any?>({ true })
+public abstract class ThresholdForker<in T> @PublishedApi internal constructor() {
+    @PublishedApi
+    internal abstract fun threshold(currentObj: T): Boolean
+
+    @PublishedApi
+    internal object NotForking : ThresholdForker<Any?>() {
+        override fun threshold(currentObj: Any?): Boolean = true
+    }
 
     public inline fun <R1, R2> fork(
         currentObj: T,
@@ -114,16 +118,24 @@ public open class ThresholdForker<in T> @PublishedApi internal constructor(
         threshold(currentObj) -> Triple(f1(NotForking), f2(NotForking), f3(NotForking))
         else -> Forker.Forking.fork({ f1(this) }, { f2(this) }, { f3(this) })
     }
+
+    public companion object {
+        @PublishedApi
+        internal inline operator fun <T> invoke(crossinline threshold: (T) -> Boolean): ThresholdForker<T> =
+            object : ThresholdForker<T>() {
+                override fun threshold(currentObj: T): Boolean = threshold(currentObj)
+            }
+    }
 }
 
 /**
     Runs the function [f] in a [ThresholdForker] context that will fork parallel operations until [threshold] returns
     true.
  */
-public fun <T, R> maybeForking(
+public inline fun <T, R> maybeForking(
     currentObject: T,
-    threshold: (T) -> Boolean,
-    f: context(ThresholdForker<T>)() -> R
+    crossinline threshold: (T) -> Boolean,
+    crossinline f: context(ThresholdForker<T>)() -> R
 ): R = when {
     threshold(currentObject) -> { f(ThresholdForker.NotForking) }
     else -> forkTask { f(ThresholdForker(threshold)) }.join()

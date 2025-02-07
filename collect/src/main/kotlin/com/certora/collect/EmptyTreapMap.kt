@@ -20,11 +20,11 @@ internal class EmptyTreapMap<@Treapable K, V> private constructor() : TreapMap<K
     override fun remove(key: K): TreapMap<K, V> = this
     override fun remove(key: K, value: V): TreapMap<K, V> = this
 
-    override fun single(): Map.Entry<K, V> = throw NoSuchElementException("Empty map.")
-    override fun singleOrNull(): Map.Entry<K, V>? = null
-    override fun arbitraryOrNull(): Map.Entry<K, V>? = null
+    override fun single(): MapEntry<K, V> = throw NoSuchElementException("Empty map.")
+    override fun singleOrNull(): MapEntry<K, V>? = null
+    override fun arbitraryOrNull(): MapEntry<K, V>? = null
 
-    override fun forEachEntry(action: (Map.Entry<K, V>) -> Unit): Unit {}
+    override fun forEachEntry(action: (MapEntry<K, V>) -> Unit): Unit {}
 
     override fun <R : Any> updateValues(
         transform: (K, V) -> R?
@@ -71,10 +71,10 @@ internal class EmptyTreapMap<@Treapable K, V> private constructor() : TreapMap<K
         merger: (K, V?, V?) -> V?
     ): TreapMap<K, V> = merge(m, mode, merger)
 
-    override fun zip(m: Map<out K, V>): Sequence<Map.Entry<K, Pair<V?, V?>>> =
+    override fun zip(m: Map<out K, V>): Sequence<MapEntry<K, Pair<V?, V?>>> =
         m.asSequence().map { MapEntry(it.key, null to it.value) }
 
-    override val entries: ImmutableSet<Map.Entry<K, V>> get() = persistentSetOf<Map.Entry<K, V>>()
+    override val entries: ImmutableSet<MapEntry<K, V>> get() = persistentSetOf<MapEntry<K, V>>()
     override val keys: TreapSet<K> get() = treapSetOf<K>()
     override val values: ImmutableCollection<V> get() = persistentSetOf<V>()
 
