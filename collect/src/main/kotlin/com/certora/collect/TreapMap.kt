@@ -221,6 +221,30 @@ public sealed interface TreapMap<K, V> : PersistentMap<K, V> {
         transform: (K, V) -> R?
     ): TreapMap<K, R>
 
+
+    /**
+        Produces a new [TreapMap] with updated entries, by applying the supplied [transform] to each entry that shares
+        a key with [m].  Removes entries for which [transform] returns null.
+     */
+    public fun <U> updateValues(
+        m: Map<K, U>,
+        transform: (K, V, U) -> V?
+    ): TreapMap<K, V>
+
+    /**
+        Produces a new [TreapMap] with updated entries, by applying the supplied [transform] to each entry that shares
+        a key with [m].  Removes entries for which [transform] returns null.
+
+        Operations are performed in parallel for maps larger than (approximately) 2^parallelThresholdLog2.
+
+        See additional nodes on [updateValues].
+     */
+    public fun <U> parallelUpdateValues(
+        m: Map<K, U>,
+        parallelThresholdLog2: Int = 5,
+        transform: (K, V, U) -> V?
+    ): TreapMap<K, V>
+
     /**
         Produces a new [TreapMap] with the entry for the specified [key] updated via [merger].
 

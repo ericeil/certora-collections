@@ -261,6 +261,26 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
         }
     }
 
+    protected fun <U> fallbackUpdateValues(
+        m: Map<K, U>,
+        transform: (K, V, U) -> V?
+    ): TreapMap<K, V> {
+        var newThis = this as TreapMap<K, V>
+        for ((k, u) in m.entries) {
+            newThis = newThis.updateEntry(k, u) { v, _ ->
+                if (v != null || k in this) {
+                    @Suppress("UNCHECKED_CAST")
+                    transform(k, v as V, u)
+                } else {
+                    v
+                }
+            }
+        }
+        return newThis
+    }
+
+    abstract fun <U> shallowUpdateValues(m: TreapMap<K, U>, transform: (K, V, U) -> V?): S?
+
     /**
         Applies a transform to each entry, producing new values, processing multiple entries in parallel.
 
@@ -649,6 +669,46 @@ private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.inter
                 { thisSplit.left.intersectWithImpl(that.left, shallowIntersect) },
                 { thisSplit.right.intersectWithImpl(that.right, shallowIntersect) },
                 { thisSplit.duplicate?.let { shallowIntersect(it, that) } }
+            )
+        }
+    }
+    return newThis?.with(newLeft, newRight) ?: (newLeft join newRight)
+}
+
+context(ThresholdForker<Pair<S, T>>)
+internal fun <@Treapable K, V, U, @Treapable S : AbstractTreapMap<K, V, S>, @Treapable T : AbstractTreapMap<K, U, T>> S?.updateValuesImpl(
+    m: T?,
+    transform: (K, V, U) -> V?
+): S? {
+    val (newLeft, newRight, newThis) = when {
+        this == null -> return null
+        m == null -> return this
+        this.comparePriorityTo(m) >= 0 -> {
+            val mSplit = m.split(this)
+            fork(
+                this to m,
+                { this.left.updateValuesImpl(mSplit.left, transform) },
+                { this.right.updateValuesImpl(mSplit.right, transform) },
+                {
+                    when (mSplit.duplicate) {
+                        null -> this
+                        else -> this.shallowUpdateValues(mSplit.duplicate!!, transform)
+                    }
+                }
+            )
+        }
+        else -> {
+            val thisSplit = this.split(m)
+            fork(
+                this to m,
+                { thisSplit.left.updateValuesImpl(m.left, transform) },
+                { thisSplit.right.updateValuesImpl(m.right, transform) },
+                {
+                    when (thisSplit.duplicate) {
+                        null -> null
+                        else -> thisSplit.duplicate!!.shallowUpdateValues(m, transform)
+                    }
+                }
             )
         }
     }

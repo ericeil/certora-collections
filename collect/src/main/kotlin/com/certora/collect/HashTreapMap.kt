@@ -1,6 +1,7 @@
 package com.certora.collect
 
 import com.certora.collect.TreapMap.MergeMode
+import com.certora.forkjoin.*
 import kotlinx.collections.immutable.PersistentMap
 
 /**
@@ -335,6 +336,51 @@ internal class HashTreapMap<@Treapable K, V>(
                         if (newEntry.shallowEquals(this)) { this } else { newEntry }
                     }
                 }
+            }
+        }
+    }
+
+    override fun <U> updateValues(
+        m: Map<K, U>,
+        transform: (K, V, U) -> V?
+    ): TreapMap<K, V> = when (m) {
+        is HashTreapMap<K, U> -> notForking(this to m) { self.updateValuesImpl(m, transform).orEmpty() }
+        else -> fallbackUpdateValues(m, transform)
+    }
+
+    override fun <U> parallelUpdateValues(
+        m: Map<K, U>,
+        parallelThresholdLog2: Int,
+        transform: (K, V, U) -> V?
+    ): TreapMap<K, V> = when (m) {
+        is HashTreapMap<K, U> -> maybeForking(
+            this to m,
+            {
+                it.first.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1) &&
+                it.second.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1)
+            }
+        ) {
+            updateValuesImpl(m, transform).orEmpty()
+        }
+        else -> fallbackUpdateValues(m, transform)
+    }
+
+    override fun <U> shallowUpdateValues(m: TreapMap<K, U>, transform: (K, V, U) -> V?): HashTreapMap<K, V>? = when {
+        m !is HashTreapMap<K, U> -> error("Map type mismatch")
+        else -> {
+            var newPairs: KeyValuePairList.More<K, V>? = null
+            this.forEachPair { (k, v) ->
+                if (m.shallowContainsKey(k)) {
+                    val newValue = transform(k, v, m.shallowGetValue(k)!!)
+                    if (newValue != null) {
+                        newPairs = KeyValuePairList.More(k, newValue, newPairs)
+                    }
+                } else {
+                    newPairs = KeyValuePairList.More(k, v, newPairs)
+                }
+            }
+            newPairs?.let {
+                HashTreapMap(it.key, it.value, it.next, this.left, this.right)
             }
         }
     }

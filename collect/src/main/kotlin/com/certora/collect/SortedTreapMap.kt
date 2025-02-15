@@ -1,6 +1,7 @@
 package com.certora.collect
 
 import com.certora.collect.TreapMap.MergeMode
+import com.certora.forkjoin.*
 import kotlinx.collections.immutable.PersistentMap
 
 /**
@@ -121,6 +122,36 @@ internal class SortedTreapMap<@Treapable K, V>(
             newValue === value -> this
             else -> SortedTreapMap(key, newValue, left, right)
         }
+    }
+
+    override fun <U> updateValues(
+        m: Map<K, U>,
+        transform: (K, V, U) -> V?
+    ): TreapMap<K, V> = when (m) {
+        is SortedTreapMap<K, U> -> notForking(this to m) { self.updateValuesImpl(m, transform).orEmpty() }
+        else -> fallbackUpdateValues(m, transform)
+    }
+
+    override fun <U> parallelUpdateValues(
+        m: Map<K, U>,
+        parallelThresholdLog2: Int,
+        transform: (K, V, U) -> V?
+    ): TreapMap<K, V> = when (m) {
+        is SortedTreapMap<K, U> -> maybeForking(
+            this to m,
+            {
+                it.first.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1) &&
+                it.second.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1)
+            }
+        ) {
+            updateValuesImpl(m, transform).orEmpty()
+        }
+        else -> fallbackUpdateValues(m, transform)
+    }
+
+    override fun <U> shallowUpdateValues(m: TreapMap<K, U>, transform: (K, V, U) -> V?): SortedTreapMap<K, V>? = when {
+        m !is SortedTreapMap<K, U> -> error("Map type mismatch")
+        else -> transform(this.key, this.value, m.value)?.let { SortedTreapMap(key, it, left, right) }
     }
 
     fun floorEntry(key: K): Map.Entry<K, V>? {
