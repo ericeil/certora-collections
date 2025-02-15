@@ -190,6 +190,8 @@ public sealed interface TreapMap<K, V> : PersistentMap<K, V> {
     public enum class MergeMode {
         /** Merge all entries from both maps. */
         UNION,
+        /** Merge all entries from both maps, but only apply the merger function to entries whose keys appear in both maps. */
+        UNION_OPTIMIZED,
         /** Only merge entries whose keys appear in both maps. */
         INTERSECTION
     }

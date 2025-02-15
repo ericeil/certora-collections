@@ -47,6 +47,8 @@ internal class HashTreapMap<@Treapable K, V>(
                 if (v != null) {
                     newPairs = KeyValuePairList.More(k, v, newPairs)
                 }
+            } else if (mode == MergeMode.UNION_OPTIMIZED) {
+                newPairs = KeyValuePairList.More(k, v1, newPairs)
             }
         }
         if (mode == MergeMode.UNION) {
@@ -57,6 +59,12 @@ internal class HashTreapMap<@Treapable K, V>(
                     if (v != null) {
                         newPairs = KeyValuePairList.More(k, v, newPairs)
                     }
+                }
+            }
+        } else if (mode == MergeMode.UNION_OPTIMIZED) {
+            t2?.forEachPair { (k, v2) ->
+                if (!t1.shallowContainsKey(k)) {
+                    newPairs = KeyValuePairList.More(k, v2, newPairs)
                 }
             }
         }

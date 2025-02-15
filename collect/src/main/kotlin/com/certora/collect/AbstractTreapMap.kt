@@ -237,10 +237,20 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
         var newThis = clear()
         val keys = when(mode) {
             MergeMode.UNION -> this.keys union m.keys
-            MergeMode.INTERSECTION -> this.keys intersect m.keys
+            MergeMode.INTERSECTION, MergeMode.UNION_OPTIMIZED -> this.keys intersect m.keys
         }
         for (k in keys) {
             merger(k, this[k], m[k])?.let { newThis = newThis.put(k, it) }
+        }
+        if (mode == MergeMode.UNION_OPTIMIZED) {
+            for (k in this.keys - keys) {
+                @Suppress("UNCHECKED_CAST")
+                newThis = newThis.put(k, this[k] as V)
+            }
+            for (k in m.keys - keys) {
+                @Suppress("UNCHECKED_CAST")
+                newThis = newThis.put(k, m[k] as V)
+            }
         }
         return newThis
     }
@@ -525,6 +535,7 @@ private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.merge
                 { this?.right.mergeWithImpl(that?.right, mode, shallowMerge) },
                 { shallowMerge(this, that) }
             )
+            MergeMode.UNION_OPTIMIZED -> return this ?: that
             MergeMode.INTERSECTION -> return null
         }
         this.comparePriorityTo(that) >= 0 -> {
