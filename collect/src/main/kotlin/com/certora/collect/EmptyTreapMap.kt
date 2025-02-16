@@ -37,14 +37,14 @@ internal class EmptyTreapMap<@Treapable K, V> private constructor() : TreapMap<K
 
     override fun <U> updateValues(
         m: Map<K, U>,
-        transform: (K, V, U) -> V?
-    ): TreapMap<K, V> = treapMapOf()
+        transform: (K, V?, U) -> V?
+    ): TreapMap<K, V> = fallbackUpdateValues(m, transform)
 
     override fun <U> parallelUpdateValues(
         m: Map<K, U>,
         parallelThresholdLog2: Int,
-        transform: (K, V, U) -> V?
-    ): TreapMap<K, V> = treapMapOf()
+        transform: (K, V?, U) -> V?
+    ): TreapMap<K, V> = fallbackUpdateValues(m, transform)
 
     override fun <R : Any> mapReduce(map: (K, V) -> R, reduce: (R, R) -> R): R? = null
     override fun <R : Any> parallelMapReduce(map: (K, V) -> R, reduce: (R, R) -> R, parallelThresholdLog2: Int): R? = null

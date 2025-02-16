@@ -126,32 +126,36 @@ internal class SortedTreapMap<@Treapable K, V>(
 
     override fun <U> updateValues(
         m: Map<K, U>,
-        transform: (K, V, U) -> V?
+        transform: (K, V?, U) -> V?
     ): TreapMap<K, V> = when (m) {
-        is SortedTreapMap<K, U> -> notForking(this to m) { self.updateValuesImpl(m, transform).orEmpty() }
+        is SortedTreapMap<K, U> -> notForking(m) { self.updateValuesImpl(m, getShallowUpdater(transform)).orEmpty() }
         else -> fallbackUpdateValues(m, transform)
     }
 
     override fun <U> parallelUpdateValues(
         m: Map<K, U>,
         parallelThresholdLog2: Int,
-        transform: (K, V, U) -> V?
+        transform: (K, V?, U) -> V?
     ): TreapMap<K, V> = when (m) {
-        is SortedTreapMap<K, U> -> maybeForking(
-            this to m,
-            {
-                it.first.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1) &&
-                it.second.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1)
-            }
-        ) {
-            updateValuesImpl(m, transform).orEmpty()
+        is SortedTreapMap<K, U> -> maybeForking(m, { it.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1) }) {
+            updateValuesImpl(m, getShallowUpdater(transform)).orEmpty()
         }
         else -> fallbackUpdateValues(m, transform)
     }
 
-    override fun <U> shallowUpdateValues(m: TreapMap<K, U>, transform: (K, V, U) -> V?): SortedTreapMap<K, V>? = when {
-        m !is SortedTreapMap<K, U> -> error("Map type mismatch")
-        else -> transform(this.key, this.value, m.value)?.let { SortedTreapMap(key, it, left, right) }
+    override fun <U, @Treapable T : AbstractTreapMap<K, U, T>> getShallowUpdater(
+        transform: (K, V?, U) -> V?
+    ): (SortedTreapMap<K, V>?, T) -> SortedTreapMap<K, V>? = { s, t ->
+        @Suppress("NAME_SHADOWING", "UNCHECKED_CAST")
+        val t = t as SortedTreapMap<K, U>
+        val newValue = transform(t.key, s?.value, t.value)
+        @Suppress("ForbiddenMethodCall")
+        println("updating ${s?.key}=${s?.value} with ${t.key}=${t.value} to $newValue")
+        when {
+            newValue == null -> null
+            newValue === s?.value -> s
+            else -> SortedTreapMap(t.key, newValue, s?.left, s?.right)
+        }
     }
 
     fun floorEntry(key: K): Map.Entry<K, V>? {

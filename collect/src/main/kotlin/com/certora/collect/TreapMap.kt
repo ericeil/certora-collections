@@ -223,17 +223,17 @@ public sealed interface TreapMap<K, V> : PersistentMap<K, V> {
 
 
     /**
-        Produces a new [TreapMap] with updated entries, by applying the supplied [transform] to each entry that shares
-        a key with [m].  Removes entries for which [transform] returns null.
+        Produces a new [TreapMap] with updated entries, by applying the supplied [transform] to each entry in [m], along
+        with the corresponding value from this map, or null if the key is absent.
      */
     public fun <U> updateValues(
         m: Map<K, U>,
-        transform: (K, V, U) -> V?
+        transform: (K, V?, U) -> V?
     ): TreapMap<K, V>
 
     /**
-        Produces a new [TreapMap] with updated entries, by applying the supplied [transform] to each entry that shares
-        a key with [m].  Removes entries for which [transform] returns null.
+        Produces a new [TreapMap] with updated entries, by applying the supplied [transform] to each entry in [m], along
+        with the corresponding value from this map, or null if the key is absent.
 
         Operations are performed in parallel for maps larger than (approximately) 2^parallelThresholdLog2.
 
@@ -242,7 +242,7 @@ public sealed interface TreapMap<K, V> : PersistentMap<K, V> {
     public fun <U> parallelUpdateValues(
         m: Map<K, U>,
         parallelThresholdLog2: Int = 5,
-        transform: (K, V, U) -> V?
+        transform: (K, V?, U) -> V?
     ): TreapMap<K, V>
 
     /**

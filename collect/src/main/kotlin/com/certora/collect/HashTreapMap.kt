@@ -118,7 +118,7 @@ internal class HashTreapMap<@Treapable K, V>(
         }
     }
 
-    private inline fun KeyValuePairList<K, V>?.forEachPair(action: (KeyValuePairList<K, V>) -> Unit) {
+    private inline fun <U> KeyValuePairList<K, U>?.forEachPair(action: (KeyValuePairList<K, U>) -> Unit) {
         var current = this
         while (current != null) {
             action(current)
@@ -342,46 +342,44 @@ internal class HashTreapMap<@Treapable K, V>(
 
     override fun <U> updateValues(
         m: Map<K, U>,
-        transform: (K, V, U) -> V?
+        transform: (K, V?, U) -> V?
     ): TreapMap<K, V> = when (m) {
-        is HashTreapMap<K, U> -> notForking(this to m) { self.updateValuesImpl(m, transform).orEmpty() }
+        is HashTreapMap<K, U> -> notForking(m) { self.updateValuesImpl(m, getShallowUpdater(transform)).orEmpty() }
         else -> fallbackUpdateValues(m, transform)
     }
 
     override fun <U> parallelUpdateValues(
         m: Map<K, U>,
         parallelThresholdLog2: Int,
-        transform: (K, V, U) -> V?
+        transform: (K, V?, U) -> V?
     ): TreapMap<K, V> = when (m) {
-        is HashTreapMap<K, U> -> maybeForking(
-            this to m,
-            {
-                it.first.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1) &&
-                it.second.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1)
-            }
-        ) {
-            updateValuesImpl(m, transform).orEmpty()
+        is HashTreapMap<K, U> -> maybeForking(m, { it.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1) }) {
+            updateValuesImpl(m, getShallowUpdater(transform)).orEmpty()
         }
         else -> fallbackUpdateValues(m, transform)
     }
 
-    override fun <U> shallowUpdateValues(m: TreapMap<K, U>, transform: (K, V, U) -> V?): HashTreapMap<K, V>? = when {
-        m !is HashTreapMap<K, U> -> error("Map type mismatch")
-        else -> {
-            var newPairs: KeyValuePairList.More<K, V>? = null
-            this.forEachPair { (k, v) ->
-                if (m.shallowContainsKey(k)) {
-                    val newValue = transform(k, v, m.shallowGetValue(k)!!)
-                    if (newValue != null) {
-                        newPairs = KeyValuePairList.More(k, newValue, newPairs)
-                    }
-                } else {
-                    newPairs = KeyValuePairList.More(k, v, newPairs)
-                }
+    override fun <U, @Treapable T : AbstractTreapMap<K, U, T>> getShallowUpdater(
+        transform: (K, V?, U) -> V?
+    ): (HashTreapMap<K, V>?, T) -> HashTreapMap<K, V>? = { s, t ->
+        @Suppress("NAME_SHADOWING", "UNCHECKED_CAST")
+        val t = t as? HashTreapMap<K, U> ?: error("Map type mismatch")
+        var newPairs: KeyValuePairList.More<K, V>? = null
+        t.forEachPair { (k, u) ->
+            val oldV = s?.shallowGetValue(k)
+            val newV = transform(k, oldV, u)
+            if (newV != null) {
+                newPairs = KeyValuePairList.More(k, newV, newPairs)
             }
-            newPairs?.let {
-                HashTreapMap(it.key, it.value, it.next, this.left, this.right)
+        }
+        s.forEachPair { (k, v) ->
+            if (!t.shallowContainsKey(k)) {
+                newPairs = KeyValuePairList.More(k, v, newPairs)
             }
+        }
+        newPairs!!.let { firstPair ->
+            val newS = HashTreapMap(firstPair.key, firstPair.value, firstPair.next, s?.left, s?.right)
+            if (s != null && newS.shallowEquals(s)) { s } else { newS }
         }
     }
 

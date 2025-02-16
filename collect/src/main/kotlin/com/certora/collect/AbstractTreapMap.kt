@@ -70,6 +70,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
     abstract fun getShallowMerger(mode: MergeMode, merger: (K, V?, V?) -> V?): (S?, S?) -> S?
     abstract fun getShallowUnionMerger(merger: (K, V, V) -> V): (S, S) -> S
     abstract fun getShallowIntersectMerger(merger: (K, V, V) -> V): (S, S) -> S?
+    abstract fun <U, @Treapable T : AbstractTreapMap<K, U, T>> getShallowUpdater(transform: (K, V?, U) -> V?): (S?, T) -> S?
 
     private fun containsEntry(entry: Map.Entry<K, V>): Boolean {
         val key = entry.key
@@ -260,26 +261,6 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
             updateValuesImpl(transform) ?: clear()
         }
     }
-
-    protected fun <U> fallbackUpdateValues(
-        m: Map<K, U>,
-        transform: (K, V, U) -> V?
-    ): TreapMap<K, V> {
-        var newThis = this as TreapMap<K, V>
-        for ((k, u) in m.entries) {
-            newThis = newThis.updateEntry(k, u) { v, _ ->
-                if (v != null || k in this) {
-                    @Suppress("UNCHECKED_CAST")
-                    transform(k, v as V, u)
-                } else {
-                    v
-                }
-            }
-        }
-        return newThis
-    }
-
-    abstract fun <U> shallowUpdateValues(m: TreapMap<K, U>, transform: (K, V, U) -> V?): S?
 
     /**
         Applies a transform to each entry, producing new values, processing multiple entries in parallel.
@@ -675,42 +656,55 @@ private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.inter
     return newThis?.with(newLeft, newRight) ?: (newLeft join newRight)
 }
 
-context(ThresholdForker<Pair<S, T>>)
-internal fun <@Treapable K, V, U, @Treapable S : AbstractTreapMap<K, V, S>, @Treapable T : AbstractTreapMap<K, U, T>> S?.updateValuesImpl(
+context(ThresholdForker<T>)
+    @Suppress("ForbiddenMethodCall")
+internal fun <@Treapable K, V, U, @Treapable S : AbstractTreapMap<K, V, S>, @Treapable T : AbstractTreapMap<K, U, T>>
+S?.updateValuesImpl(
     m: T?,
-    transform: (K, V, U) -> V?
+    updater: (S?, T) -> S?
 ): S? {
     val (newLeft, newRight, newThis) = when {
-        this == null -> return null
         m == null -> return this
+        this == null -> {
+            fork(
+                m,
+                { null.updateValuesImpl(m.left, updater) },
+                { null.updateValuesImpl(m.right, updater) },
+                { updater(null, m) }
+            )
+        }
         this.comparePriorityTo(m) >= 0 -> {
             val mSplit = m.split(this)
             fork(
-                this to m,
-                { this.left.updateValuesImpl(mSplit.left, transform) },
-                { this.right.updateValuesImpl(mSplit.right, transform) },
-                {
-                    when (mSplit.duplicate) {
-                        null -> this
-                        else -> this.shallowUpdateValues(mSplit.duplicate!!, transform)
-                    }
-                }
+                m,
+                { this.left.updateValuesImpl(mSplit.left, updater) },
+                { this.right.updateValuesImpl(mSplit.right, updater) },
+                { mSplit.duplicate.let { if (it != null) { updater(this, it) } else { this }}}
             )
         }
         else -> {
             val thisSplit = this.split(m)
             fork(
-                this to m,
-                { thisSplit.left.updateValuesImpl(m.left, transform) },
-                { thisSplit.right.updateValuesImpl(m.right, transform) },
-                {
-                    when (thisSplit.duplicate) {
-                        null -> null
-                        else -> thisSplit.duplicate!!.shallowUpdateValues(m, transform)
-                    }
-                }
+                m,
+                { m.left.let { if (it == null) { thisSplit.left } else { thisSplit.left.updateValuesImpl(it, updater) }}},
+                { m.right.let { if (it == null) { thisSplit.right } else { thisSplit.right.updateValuesImpl(it, updater) }}},
+                { updater(thisSplit.duplicate, m) }
             )
         }
     }
     return newThis?.with(newLeft, newRight) ?: (newLeft join newRight)
 }
+
+internal fun <@Treapable K, V, U> TreapMap<K, V>.fallbackUpdateValues(
+    m: Map<K, U>,
+    transform: (K, V?, U) -> V?
+): TreapMap<K, V> {
+    var newThis = this
+    for ((k, u) in m.entries) {
+        newThis = newThis.updateEntry(k, u) { v, _ ->
+            transform(k, v, u)
+        }
+    }
+    return newThis
+}
+

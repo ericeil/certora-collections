@@ -517,6 +517,37 @@ abstract class TreapMapTest {
     }
 
     @Test
+    fun updateValues() {
+        assertEquals(testMapOf(), testMapOf().updateValues(testMapOf()) { _, a, _ -> a })
+        assertEquals(testMapOf(1 to 2), testMapOf(1 to 2).updateValues(testMapOf()) { _, a, _ -> a })
+        assertEquals(testMapOf(1 to 2), testMapOf().updateValues(testMapOf(1 to 2)) { _, _, b -> b })
+        assertEquals(
+            testMapOf(1 to 2, 2 to 3, 3 to 4),
+            testMapOf(1 to 2, 2 to 3).updateValues(testMapOf(2 to 3, 3 to 4)) { _, _, b -> b }
+        )
+
+        val m1 = testMapOf(2 to 2, 3 to 3)
+        val m2 = testMapOf(3 to 4)
+        assertEquals(
+            mapOf(2 to 2, 3 to 3),
+            m1.updateValues(m2) { _, a, _ -> a }
+        )
+        assertEquals(
+            mapOf(3 to 4),
+            m2.updateValues(m1) { _, a, _ -> a }
+        )
+        assertEquals(
+            mapOf(2 to 2, 3 to 4),
+            m1.updateValues(m2) { _, _, b -> b }
+        )
+        assertEquals(
+            mapOf(2 to 2, 3 to 3),
+            m2.updateValues(m1) { _, _, b -> b }
+        )
+    }
+
+
+    @Test
     fun zip() {
         assertEquals(
             setOf<Map.Entry<Int, Pair<Int?, Int?>>>(),
