@@ -377,7 +377,7 @@ internal class HashTreapMap<@Treapable K, V>(
                 newPairs = KeyValuePairList.More(k, v, newPairs)
             }
         }
-        newPairs!!.let { firstPair ->
+        newPairs?.let { firstPair ->
             val newS = HashTreapMap(firstPair.key, firstPair.value, firstPair.next, s?.left, s?.right)
             if (s != null && newS.shallowEquals(s)) { s } else { newS }
         }
