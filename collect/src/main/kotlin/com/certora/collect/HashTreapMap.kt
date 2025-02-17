@@ -382,6 +382,7 @@ internal class HashTreapMap<@Treapable K, V>(
             if (s != null && newS.shallowEquals(s)) { s } else { newS }
         }
     }
+    
 
     override fun shallowComputeHashCode(): Int {
         var h = 0
