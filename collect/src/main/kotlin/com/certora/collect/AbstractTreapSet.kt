@@ -6,10 +6,10 @@ import com.certora.forkjoin.*
     Base class for TreapSet implementations.  Provides the Set operations; derived classes deal with type-specific
     behavior such as hash collisions.  See `Treap` for an overview of all of this.
  */
-internal sealed class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S>>(
+internal sealed class AbstractTreapSet<@Treapable E, TK: TreapKey<E>, S : AbstractTreapSet<E, TK, S>>(
     left: S?,
     right: S?
-) : TreapSet<E>, Treap<E, Unit, S>(left, right) {
+) : TreapSet<E>, Treap<E, Unit, TK, S>(left, right) {
     /**
         Derived classes override to create an apropriate node containing the given element.
      */
@@ -167,7 +167,7 @@ internal sealed class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S>>
     derived classes use to, e.g, merge hash buckets. Note that we always prefer to return 'this' over 'that', to
     preserve the object identity invariant described in the `Treap` summary.
  */
-internal infix fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.treapUnion(that: S?): S? = when {
+internal infix fun <@Treapable E, TK: TreapKey<E>, S : AbstractTreapSet<E, TK, S>> S?.treapUnion(that: S?): S? = when {
     this == null -> that
     that == null -> this
     this === that -> this
@@ -183,7 +183,7 @@ internal infix fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.treapUnion(that
     }
 }
 
-private fun <@Treapable E, S : AbstractTreapSet<E, S>> unionMerge(higher: S, lower: S) =
+private fun <@Treapable E, TK: TreapKey<E>, S : AbstractTreapSet<E, TK, S>> unionMerge(higher: S, lower: S) =
     // Note that the "higher" key can not occur in "lower", because if it did it wouldn't have a higher priority. We
     // don't need to worry about the split's `duplicate` field.
     lower.split(higher).let { lowerSplit ->
@@ -194,7 +194,7 @@ private fun <@Treapable E, S : AbstractTreapSet<E, S>> unionMerge(higher: S, low
     Computes the intersection of two treaps. Note that we always prefer to return 'this' over 'that', to preserve the
     object identity invariant described in the `Treap` summary.
  */
-internal fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.intersectWith(that: S?): S? = when {
+internal fun <@Treapable E, TK: TreapKey<E>, S : AbstractTreapSet<E, TK, S>> S?.intersectWith(that: S?): S? = when {
     this == null -> null
     that == null -> null
     this === that -> this
@@ -217,7 +217,7 @@ internal fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.intersectWith(that: S
     }
 }
 
-private fun <@Treapable E, S : AbstractTreapSet<E, S>> intersectMerge(higher: S, lower: S) =
+private fun <@Treapable E, TK: TreapKey<E>, S : AbstractTreapSet<E, TK, S>> intersectMerge(higher: S, lower: S) =
     // Note that the "higher" key can not occur in "lower", because if it did it wouldn't have a higher priority. We
     // don't need to worry about the split's `duplicate` field.
     lower.split(higher).let { lowerSplit ->
@@ -227,7 +227,7 @@ private fun <@Treapable E, S : AbstractTreapSet<E, S>> intersectMerge(higher: S,
 /**
     Removes the items in `that` from `this`.
  */
-internal infix fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.difference(that: S?): S? = when {
+internal infix fun <@Treapable E, TK: TreapKey<E>, S : AbstractTreapSet<E, TK, S>> S?.difference(that: S?): S? = when {
     this == null -> null
     that == null -> this
     this === that -> null
@@ -254,7 +254,7 @@ internal infix fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.difference(that
 
     ...except that we don't want to do all of the work that would imply, if we can avoid it.
  */
-internal fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.containsAllKeys(that: S?): Boolean = when {
+internal fun <@Treapable E, TK: TreapKey<E>, S : AbstractTreapSet<E, TK, S>> S?.containsAllKeys(that: S?): Boolean = when {
     that == null -> true
     this == null -> false
     else -> {
@@ -273,7 +273,7 @@ internal fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.containsAllKeys(that:
 
     ...except that we don't want to do all of the work that would imply, if we can avoid it.
  */
-internal fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.containsAnyKeys(that: S?): Boolean = when {
+internal fun <@Treapable E, TK: TreapKey<E>, S : AbstractTreapSet<E, TK, S>> S?.containsAnyKeys(that: S?): Boolean = when {
     that == null -> false
     this == null -> false
     else -> {

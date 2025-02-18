@@ -13,7 +13,7 @@ internal class SortedTreapMap<@Treapable K, V>(
     val value: V,
     left: SortedTreapMap<K, V>? = null,
     right: SortedTreapMap<K, V>? = null
-) : AbstractTreapMap<K, V, SortedTreapMap<K, V>>(left, right), TreapKey.Sorted<K> {
+) : AbstractTreapMap<K, V, TreapKey.Sorted<K>, SortedTreapMap<K, V>>(left, right), TreapKey.Sorted<K> {
 
     init { check(key is Comparable<*>?) { "SortedTreapMap keys must be Comparable" } }
 
@@ -143,7 +143,7 @@ internal class SortedTreapMap<@Treapable K, V>(
         else -> fallbackUpdateValues(m, transform)
     }
 
-    override fun <U, @Treapable T : AbstractTreapMap<K, U, T>> getShallowUpdater(
+    override fun <U, @Treapable T : AbstractTreapMap<K, U, TreapKey.Sorted<K>, T>> getShallowUpdater(
         transform: (K, V?, U) -> V?
     ): (SortedTreapMap<K, V>?, T) -> SortedTreapMap<K, V>? = { s, t ->
         @Suppress("NAME_SHADOWING", "UNCHECKED_CAST")
@@ -210,7 +210,7 @@ internal class SortedTreapMap<@Treapable K, V>(
     private fun treapSetFromKeys(): SortedTreapSet<K> =
         SortedTreapSet(treapKey, left?.treapSetFromKeys(), right?.treapSetFromKeys())
 
-    inner class KeySet : AbstractKeySet<K, SortedTreapSet<K>>() {
+    inner class KeySet : AbstractKeySet<K, TreapKey.Sorted<K>, SortedTreapSet<K>>() {
         override val map get() = this@SortedTreapMap
         override val keys = lazy { treapSetFromKeys() }
         override fun hashCode() = super.hashCode() // avoids treapability warning

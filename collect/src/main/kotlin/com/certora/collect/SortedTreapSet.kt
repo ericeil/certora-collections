@@ -10,7 +10,7 @@ internal class SortedTreapSet<@Treapable E>(
     override val treapKey: E,
     left: SortedTreapSet<E>? = null,
     right: SortedTreapSet<E>? = null
-) : AbstractTreapSet<E, SortedTreapSet<E>>(left, right), TreapKey.Sorted<E> {
+) : AbstractTreapSet<E, TreapKey.Sorted<E>, SortedTreapSet<E>>(left, right), TreapKey.Sorted<E> {
 
     init { check(treapKey is Comparable<*>?) { "SortedTreapSet elements must be Comparable" } }
 

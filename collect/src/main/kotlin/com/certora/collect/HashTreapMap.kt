@@ -19,7 +19,7 @@ internal class HashTreapMap<@Treapable K, V>(
     override val next: KeyValuePairList.More<K, V>? = null,
     left: HashTreapMap<K, V>? = null,
     right: HashTreapMap<K, V>? = null
-) : AbstractTreapMap<K, V, HashTreapMap<K, V>>(left, right), TreapKey.Hashed<K>, KeyValuePairList<K, V> {
+) : AbstractTreapMap<K, V, TreapKey.Hashed<K>, HashTreapMap<K, V>>(left, right), TreapKey.Hashed<K>, KeyValuePairList<K, V> {
 
     override fun hashCode() = computeHashCode()
 
@@ -359,7 +359,7 @@ internal class HashTreapMap<@Treapable K, V>(
         else -> fallbackUpdateValues(m, transform)
     }
 
-    override fun <U, @Treapable T : AbstractTreapMap<K, U, T>> getShallowUpdater(
+    override fun <U, @Treapable T : AbstractTreapMap<K, U, TreapKey.Hashed<K>, T>> getShallowUpdater(
         transform: (K, V?, U) -> V?
     ): (HashTreapMap<K, V>?, T) -> HashTreapMap<K, V>? = { s, t ->
         @Suppress("NAME_SHADOWING", "UNCHECKED_CAST")
@@ -408,7 +408,7 @@ internal class HashTreapMap<@Treapable K, V>(
     private fun treapSetFromKeys(): HashTreapSet<K> =
         HashTreapSet(treapKey, next?.toKeyList(), left?.treapSetFromKeys(), right?.treapSetFromKeys())
 
-    inner class KeySet : AbstractKeySet<K, HashTreapSet<K>>() {
+    inner class KeySet : AbstractKeySet<K, TreapKey.Hashed<K>, HashTreapSet<K>>() {
         override val map get() = this@HashTreapMap
         override val keys = lazy { treapSetFromKeys() }
         override fun hashCode() = super.hashCode() // avoids treapability warning

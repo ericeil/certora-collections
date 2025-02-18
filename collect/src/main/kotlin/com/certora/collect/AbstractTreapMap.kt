@@ -9,10 +9,10 @@ import kotlinx.collections.immutable.ImmutableSet
     Base class for TreapMap implementations.  Provides the Map operations; derived classes deal with type-specific
     behavior such as hash collisions.  See [Treap] for an overview of all of this.
  */
-internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>>(
+internal sealed class AbstractTreapMap<@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>>(
     left: S?,
     right: S?
-) : TreapMap<K, V>, Treap<K, V, S>(left, right) {
+) : TreapMap<K, V>, Treap<K, V, TK, S>(left, right) {
 
     /**
         Derived classes override to create an apropriate node containing the given entry.
@@ -24,7 +24,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
         as 'this' AbstractTreapMap.  For example, if this is a HashTreapMap, and so is the supplied collection.
         Otherwise returns null.
      */
-    abstract fun Map<out K, V>.toTreapMapOrNull(): AbstractTreapMap<K, V, S>?
+    abstract fun Map<out K, V>.toTreapMapOrNull(): S?
 
     /**
         Given a map, calls the supplied `action` if the collection is a Treap of the same type as this Treap, otherwise
@@ -70,7 +70,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
     abstract fun getShallowMerger(mode: MergeMode, merger: (K, V?, V?) -> V?): (S?, S?) -> S?
     abstract fun getShallowUnionMerger(merger: (K, V, V) -> V): (S, S) -> S
     abstract fun getShallowIntersectMerger(merger: (K, V, V) -> V): (S, S) -> S?
-    abstract fun <U, @Treapable T : AbstractTreapMap<K, U, T>> getShallowUpdater(transform: (K, V?, U) -> V?): (S?, T) -> S?
+    abstract fun <U, @Treapable T : AbstractTreapMap<K, U, TK, T>> getShallowUpdater(transform: (K, V?, U) -> V?): (S?, T) -> S?
 
     private fun containsEntry(entry: Map.Entry<K, V>): Boolean {
         val key = entry.key
@@ -251,7 +251,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
      */
     @Suppress("UNCHECKED_CAST", "Treapability")
     override fun <R : Any> updateValues(transform: (K, V) -> R?): TreapMap<K, R> =
-        (this as AbstractTreapMap<Any?, Any?, *>).updateValuesErasedTypes(
+        (this as AbstractTreapMap<Any?, Any?, *, *>).updateValuesErasedTypes(
             transform as (Any?, Any?) -> Any?
         ) as TreapMap<K, R>
 
@@ -272,7 +272,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
      */
     @Suppress("UNCHECKED_CAST", "Treapability")
     override fun <R : Any> parallelUpdateValues(parallelThresholdLog2: Int, transform: (K, V) -> R?): TreapMap<K, R> =
-        (this as AbstractTreapMap<Any?, Any?, *>).parallelUpdateValuesErasedTypes(
+        (this as AbstractTreapMap<Any?, Any?, *, *>).parallelUpdateValuesErasedTypes(
             parallelThresholdLog2,
             transform as (Any?, Any?) -> Any?
         ) as TreapMap<K, R>
@@ -425,7 +425,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractT
 /**
     Removes a map entry (`entryKey`, `entryValue`) with key `key`.
  */
-internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.removeEntry(
+internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.removeEntry(
     key: TreapKey<K>,
     entryKey: K,
     entryValue: V
@@ -442,7 +442,7 @@ internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.remo
     }
 }
 
-internal fun <@Treapable K, V, U, @Treapable S : AbstractTreapMap<K, V, S>> S?.updateEntry(
+internal fun <@Treapable K, V, U, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.updateEntry(
     thatKey: TreapKey<K>,
     entryKey: K,
     toUpdate: U,
@@ -484,7 +484,7 @@ internal fun <@Treapable K, V, U, @Treapable S : AbstractTreapMap<K, V, S>> S?.u
     the Treaps, to support the semantics of the higher-level Map.merge() function.  Note that we always prefer to return
     'this' over 'that', to preserve the object identity invariant described in the `Treap` summary.
  */
-internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.mergeWith(
+internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.mergeWith(
     that: S?,
     mode: MergeMode,
     shallowMerge: (S?, S?) -> S?
@@ -493,7 +493,7 @@ internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.merg
         mergeWithImpl(that, mode, shallowMerge)
     }
 
-internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.parallelMergeWith(
+internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.parallelMergeWith(
     that: S?,
     mode: MergeMode,
     parallelThresholdLog2: Int,
@@ -510,7 +510,7 @@ internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.para
     }
 
 context(ThresholdForker<Pair<S?, S?>>)
-private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.mergeWithImpl(
+private fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.mergeWithImpl(
     that: S?,
     mode: MergeMode,
     shallowMerge: (S?, S?) -> S?
@@ -551,7 +551,7 @@ private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.merge
     return newThis?.with(newLeft, newRight) ?: (newLeft join newRight)
 }
 
-internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.unionWith(
+internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.unionWith(
     that: S?,
     shallowUnion: (S, S) -> S
 ): S? =
@@ -559,7 +559,7 @@ internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.unio
         unionWithImpl(that, shallowUnion)
     }
 
-internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.parallelUnionWith(
+internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.parallelUnionWith(
     that: S?,
     parallelThresholdLog2: Int,
     shallowUnion: (S, S) -> S
@@ -575,7 +575,7 @@ internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.para
     }
 
 context(ThresholdForker<Pair<S?, S?>>)
-private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.unionWithImpl(
+private fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.unionWithImpl(
     that: S?,
     shallowUnion: (S, S) -> S
 ): S? {
@@ -604,7 +604,7 @@ private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.union
     return newThis.with(newLeft, newRight)
 }
 
-internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.intersectWith(
+internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.intersectWith(
     that: S?,
     shallowIntersect: (S, S) -> S?
 ): S? =
@@ -612,7 +612,7 @@ internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.inte
         intersectWithImpl(that, shallowIntersect)
     }
 
-internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.parallelIntersectWith(
+internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.parallelIntersectWith(
     that: S?,
     parallelThresholdLog2: Int,
     shallowIntersect: (S, S) -> S?
@@ -628,7 +628,7 @@ internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.para
     }
 
 context(ThresholdForker<Pair<S?, S?>>)
-private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.intersectWithImpl(
+private fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.intersectWithImpl(
     that: S?,
     shallowIntersect: (S, S) -> S?
 ): S? {
@@ -658,7 +658,7 @@ private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.inter
 
 context(ThresholdForker<T>)
     @Suppress("ForbiddenMethodCall")
-internal fun <@Treapable K, V, U, @Treapable S : AbstractTreapMap<K, V, S>, @Treapable T : AbstractTreapMap<K, U, T>>
+internal fun <@Treapable K, V, U, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>, @Treapable T : AbstractTreapMap<K, U, TK, T>>
 S?.updateValuesImpl(
     m: T?,
     updater: (S?, T) -> S?

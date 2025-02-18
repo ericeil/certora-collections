@@ -11,12 +11,12 @@ package com.certora.collect
     creating the set entirely, and just use the map directly.  However, many operations, e.g. [addAll]/[union] and
     [retainAll/intersect], are much more efficient when we have a [TreapSet], so we create it when needed.
  */
-internal abstract class AbstractKeySet<@Treapable K, S : TreapSet<K>> : TreapSet<K> {
+internal abstract class AbstractKeySet<@Treapable K, TK: TreapKey<K>, S : TreapSet<K>> : TreapSet<K> {
     /**
         The map whose keys we are presenting as a set.  We prefer to use the map directly when possible, so we don't
         need to create the set.
      */
-    abstract val map: AbstractTreapMap<K, *, *>
+    abstract val map: AbstractTreapMap<K, *, TK, *>
     /**
         The set of keys.  This is a lazy property so that we don't create the set until we need it.
      */
