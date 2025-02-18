@@ -9,7 +9,7 @@ import com.certora.forkjoin.*
 internal sealed class AbstractTreapSet<@Treapable E, S : AbstractTreapSet<E, S>>(
     left: S?,
     right: S?
-) : TreapSet<E>, Treap<E, S>(left, right) {
+) : TreapSet<E>, Treap<E, Unit, S>(left, right) {
     /**
         Derived classes override to create an apropriate node containing the given element.
      */
