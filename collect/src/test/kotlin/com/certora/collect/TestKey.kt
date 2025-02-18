@@ -5,20 +5,24 @@ import kotlinx.serialization.Serializable
 
 /** Type to use as a key for Treap tests. */
 @Treapable
-sealed class TestKey : java.io.Serializable
+sealed class TestKey : java.io.Serializable {
+    abstract val value: Int
+}
 
 /** Type to use as a key for Treap tests.  Allows tests to control exact hash codes. */
 @Serializable
-class HashTestKey(val value: Int, val code: Int = value.hashCode()) : TestKey() {
+class HashTestKey(override val value: Int, val code: Int = value.hashCode()) : TestKey() {
     private constructor() : this(0, 0) // for serialization
+    override fun toString() = value.toString()
     override fun hashCode() = code
     override fun equals(other: Any?) = other is HashTestKey && other.value == this.value
 }
 
 /** Adds Comparable. */
 @Serializable
-class ComparableTestKey(private val value: Int, private val code: Int = value.hashCode()) : TestKey(), Comparable<ComparableTestKey> {
+class ComparableTestKey(override val value: Int, private val code: Int = value.hashCode()) : TestKey(), Comparable<ComparableTestKey> {
     private constructor() : this(0, 0) // for serialization
+    override fun toString() = value.toString()
     override fun hashCode() = code
     override fun equals(other: Any?) = other is ComparableTestKey && other.value == this.value
     override fun compareTo(other: ComparableTestKey): Int {

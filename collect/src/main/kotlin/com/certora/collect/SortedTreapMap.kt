@@ -1,6 +1,5 @@
 package com.certora.collect
 
-import com.certora.collect.TreapMap.MergeMode
 import com.certora.forkjoin.*
 import kotlinx.collections.immutable.PersistentMap
 
@@ -36,39 +35,6 @@ internal class SortedTreapMap<@Treapable K, V>(
     override fun singleOrNull(): Map.Entry<K, V>? = MapEntry(key, value).takeIf { left == null && right == null }
     override fun arbitraryOrNull(): Map.Entry<K, V>? = MapEntry(key, value)
 
-    override fun getShallowUnionMerger(
-        merger: (K, V, V) -> V
-    ): (SortedTreapMap<K, V>, SortedTreapMap<K, V>) -> SortedTreapMap<K, V> = { t1, t2 ->
-        val v = merger(t1.key, t1.value, t2.value)
-        SortedTreapMap(t1.key, v, t1.left, t1.right)
-    }
-
-    override fun getShallowIntersectMerger(
-        merger: (K, V, V) -> V
-    ): (SortedTreapMap<K, V>, SortedTreapMap<K, V>) -> SortedTreapMap<K, V>? = { t1, t2 ->
-        val v = merger(t1.key, t1.value, t2.value)
-        SortedTreapMap(t1.key, v, t1.left, t1.right)
-    }
-
-    override fun getShallowMerger(
-        mode: MergeMode,
-        merger: (K, V?, V?) -> V?
-    ): (SortedTreapMap<K, V>?, SortedTreapMap<K, V>?) -> SortedTreapMap<K, V>? = merge@{ t1, t2 ->
-        if (mode == MergeMode.INTERSECTION && (t1 == null || t2 == null)) {
-            return@merge null
-        }
-        val k = (t1 ?: t2)!!.key
-        val v1 = t1?.value
-        val v2 = t2?.value
-        val v = merger(k, v1, v2)
-        when {
-            v == null -> null
-            t1 != null -> if (v == v1) { t1 } else { SortedTreapMap<K, V>(k, v, t1.left, t1.right) }
-            t2 != null -> if (v == v2) { t2 } else { SortedTreapMap<K, V>(k, v, t2.left, t2.right) }
-            else -> throw IllegalArgumentException("shallow merge with no treaps")
-        }
-    }
-
     protected override fun getTreapSequencesIfSameType(
         that: Map<out K, V>
     ): Pair<Sequence<SortedTreapMap<K, V>>, Sequence<SortedTreapMap<K, V>>>? {
@@ -92,17 +58,17 @@ internal class SortedTreapMap<@Treapable K, V>(
     override val shallowSize get() = 1
     override fun shallowRemove(element: K): SortedTreapMap<K, V>? = null
     override fun shallowRemoveEntry(key: K, value: V): SortedTreapMap<K, V>? = this.takeIf { this.value != value }
-    override fun shallowGetValue(key: K): V = value
+    override fun shallowGetValueOrNull(key: K): V = value
     override fun shallowEquals(that: SortedTreapMap<K, V>): Boolean = this.value == that.value
     override fun shallowComputeHashCode(): Int = AbstractMapEntry.hashCode(key, value)
 
     override fun copyWith(left: SortedTreapMap<K, V>?, right: SortedTreapMap<K, V>?) = SortedTreapMap(key, value, left, right)
 
     override fun shallowAdd(that: SortedTreapMap<K, V>): SortedTreapMap<K, V> {
-        return if (this.shallowGetValue(treapKey) == that.shallowGetValue(treapKey)) {
+        return if (this.value == that.value) {
             this
         } else {
-            SortedTreapMap(treapKey, that.shallowGetValue(treapKey), left, right)
+            SortedTreapMap(treapKey, that.value, left, right)
         }
     }
 
@@ -115,46 +81,12 @@ internal class SortedTreapMap<@Treapable K, V>(
         }
     }
 
-    override fun <U> shallowUpdate(entryKey: K, toUpdate: U, merger: (V?, U) -> V?): SortedTreapMap<K, V>? {
-        val newValue = merger(value, toUpdate)
+    override fun shallowUpdate(entryKey: K, transform: (V?) -> V?): SortedTreapMap<K, V>? {
+        val newValue = transform(value)
         return when {
             newValue == null -> null
             newValue === value -> this
             else -> SortedTreapMap(key, newValue, left, right)
-        }
-    }
-
-    override fun <U> updateValues(
-        m: Map<K, U>,
-        transform: (K, V?, U) -> V?
-    ): TreapMap<K, V> = when (m) {
-        is SortedTreapMap<K, U> -> notForking(m) { self.updateValuesImpl(m, getShallowUpdater(transform)).orEmpty() }
-        else -> fallbackUpdateValues(m, transform)
-    }
-
-    override fun <U> parallelUpdateValues(
-        m: Map<K, U>,
-        parallelThresholdLog2: Int,
-        transform: (K, V?, U) -> V?
-    ): TreapMap<K, V> = when (m) {
-        is SortedTreapMap<K, U> -> maybeForking(m, { it.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1) }) {
-            updateValuesImpl(m, getShallowUpdater(transform)).orEmpty()
-        }
-        else -> fallbackUpdateValues(m, transform)
-    }
-
-    override fun <U, @Treapable T : AbstractTreapMap<K, U, TreapKey.Sorted<K>, T>> getShallowUpdater(
-        transform: (K, V?, U) -> V?
-    ): (SortedTreapMap<K, V>?, T) -> SortedTreapMap<K, V>? = { s, t ->
-        @Suppress("NAME_SHADOWING", "UNCHECKED_CAST")
-        val t = t as SortedTreapMap<K, U>
-        val newValue = transform(t.key, s?.value, t.value)
-        @Suppress("ForbiddenMethodCall")
-        println("updating ${s?.key}=${s?.value} with ${t.key}=${t.value} to $newValue")
-        when {
-            newValue == null -> null
-            newValue === s?.value -> s
-            else -> SortedTreapMap(t.key, newValue, s?.left, s?.right)
         }
     }
 
@@ -217,4 +149,107 @@ internal class SortedTreapMap<@Treapable K, V>(
     }
 
     override val keys get() = KeySet()
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <R> R.toNode(a: SortedTreapMap<K, *>?, b: SortedTreapMap<K, *>?): SortedTreapMap<K, R> = when {
+        a != null && this === a.value -> a as SortedTreapMap<K, R>
+        b != null && this === b.value -> b as SortedTreapMap<K, R>
+        else -> SortedTreapMap(a?.key ?: b!!.key, this, null, null)
+    }
+
+    private fun unionMerger(merger: (K, V, V) -> V) = 
+        object : TreapMerger.KeepAllMergeIntersection<K, V, TreapKey.Sorted<K>, SortedTreapMap<K, V>>() {
+            override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapMap<K, V>?): SortedTreapMap<K, V>? {
+                a!!; b!!
+                val k = a.key
+                return merger(k, a.value, b.value).toNode(a, b)
+            }
+        }
+
+    override fun union(m: Map<K, V>, merger: (K, V, V) -> V): TreapMap<K, V> = when (m) {
+        is SortedTreapMap<K, V> -> unionMerger(merger).merge(this, m).orEmpty()
+        else -> fallbackUnion(m, merger)
+    }
+    override fun parallelUnion(m: Map<K, V>, parallelThresholdLog2: Int, merger: (K, V, V) -> V): TreapMap<K, V> = when (m) {
+        is SortedTreapMap<K, V> -> unionMerger(merger).parallelMerge(this, m, parallelThresholdLog2).orEmpty()
+        else -> fallbackUnion(m, merger)
+    }
+
+    private fun <U, R> intersectMerger(merger: (K, V, U) -> R) =
+        object : TreapMerger.KeepIntersection<K, V, U, R, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>, SortedTreapMap<K, R>>() {
+            override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapMap<K, U>?): SortedTreapMap<K, R>? {
+                a!!; b!!
+                val k = a.key
+                return merger(k, a.value, b.value).toNode(a, b)
+            }
+        }
+
+    override fun <U, R> intersect(m: Map<K, U>, merger: (K, V, U) -> R): TreapMap<K, R> = when (m) {
+        is SortedTreapMap<K, U> -> intersectMerger(merger).merge(this, m).orEmpty()
+        else -> fallbackIntersect(m, merger)
+    }
+    override fun <U, R> parallelIntersect(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V, U) -> R): TreapMap<K, R> = when (m) {
+        is SortedTreapMap<K, U> -> intersectMerger(merger).parallelMerge(this, m, parallelThresholdLog2).orEmpty()
+        else -> fallbackIntersect(m, merger)
+    }
+
+
+    private fun <U> updateValuesMerger(transform: (K, V?, U) -> V?) =
+        object : TreapMerger.KeepAllMergeB<K, V, U, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>>() {
+            override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapMap<K, U>?): SortedTreapMap<K, V>? {
+                val k = b!!.key
+                return transform(k, a?.value, b.value)?.toNode(a, b)
+            }
+        }
+
+    override fun <U> updateValues(
+        m: Map<K, U>,
+        transform: (K, V?, U) -> V?
+    ): TreapMap<K, V> = when (m) {
+        is SortedTreapMap<K, U> -> updateValuesMerger(transform).merge(this, m).orEmpty()
+        else -> fallbackUpdateValues(m, transform)
+    }
+    override fun <U> parallelUpdateValues(
+        m: Map<K, U>,
+        parallelThresholdLog2: Int,
+        transform: (K, V?, U) -> V?
+    ): TreapMap<K, V> = when (m) {
+        is SortedTreapMap<K, U> -> updateValuesMerger(transform).parallelMerge(this, m, parallelThresholdLog2).orEmpty()
+        else -> fallbackUpdateValues(m, transform)
+    }
+
+    private fun <U, R> mergeMerger(merger: (K, V?, U?) -> R?) =
+        object : TreapMerger.MergeAll<K, V, U, R, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>, SortedTreapMap<K, R>>() {
+            override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapMap<K, U>?): SortedTreapMap<K, R>? {                
+                val k = a?.key ?: b!!.key
+                return merger(k, a?.value, b?.value)?.toNode(a, b)
+            }
+        }
+
+    override fun <U, R> merge(m: Map<K, U>, merger: (K, V?, U?) -> R?): TreapMap<K, R> = when (m) {
+        is SortedTreapMap<K, U> -> mergeMerger<U, R>(merger).merge(this, m).orEmpty()
+        else -> fallbackMerge(m, merger)
+    }
+    override fun <U, R> parallelMerge(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V?, U?) -> R?): TreapMap<K, R> = when (m) {
+        is SortedTreapMap<K, U> -> mergeMerger<U, R>(merger).parallelMerge(this, m, parallelThresholdLog2).orEmpty()
+        else -> fallbackMerge(m, merger)
+    }
+
+    private fun <U, R> mergeIntersectionMerger(merger: (K, V, U) -> R?) =
+        object : TreapMerger.KeepIntersection<K, V, U, R, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>, SortedTreapMap<K, R>>() {
+            override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapMap<K, U>?): SortedTreapMap<K, R>? {
+                a!!; b!!
+                val k = a.key 
+                return merger(k, a.value, b.value)?.toNode(a, b)
+            }
+        }
+
+    override fun <U, R> mergeIntersection(m: Map<K, U>, merger: (K, V, U) -> R?): TreapMap<K, R> = when (m) {
+        is SortedTreapMap<K, U> -> mergeIntersectionMerger(merger).merge(this, m).orEmpty()
+        else -> fallbackMergeIntersection(m, merger)
+    }
+    override fun <U, R> parallelMergeIntersection(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V, U) -> R?): TreapMap<K, R> = when (m) {
+        is SortedTreapMap<K, U> -> mergeIntersectionMerger(merger).parallelMerge(this, m, parallelThresholdLog2).orEmpty()
+        else -> fallbackMergeIntersection(m, merger)
+    }
 }

@@ -26,6 +26,8 @@ internal abstract class TreapMerger<
     context(ThresholdForker<Pair<A?, B?>>)
     protected abstract fun mergeMismatch(a: A?, b: B?): R?
 
+    context(ThresholdForker<Pair<A?, B?>>)
+    protected abstract fun shallowMergeMismatch(a: A?, b: B?): R?
 
     context(ThresholdForker<Pair<A?, B?>>)
     protected fun mergeKeepers(a: A?, b: B?): R? {
@@ -51,7 +53,12 @@ internal abstract class TreapMerger<
         aLeft to bLeft,
         { mergeTreaps(aLeft, bLeft) },
         { mergeTreaps(aRight, bRight) },
-        { shallowMerge(aCenter, bCenter) }
+        { 
+            when {
+                aCenter == null || bCenter == null -> shallowMergeMismatch(aCenter, bCenter)
+                else -> shallowMerge(aCenter, bCenter)
+            }
+        }
     )
 
     abstract class MergeAll<
@@ -59,6 +66,8 @@ internal abstract class TreapMerger<
     > : TreapMerger<K, AV, BV, RV, TK, A, B, R>() {
         context(ThresholdForker<Pair<A?, B?>>)
         override fun mergeMismatch(a: A?, b: B?): R? = mergeKeepers(a, b)
+        context(ThresholdForker<Pair<A?, B?>>)
+        override fun shallowMergeMismatch(a: A?, b: B?): R? = shallowMerge(a, b)
         override fun parallelMergeTheshold(a: A?, b: B?, parallelThresholdLog2: Int): Boolean =
             a.isApproximatelySmallerThanLog2(parallelThresholdLog2) && 
             b.isApproximatelySmallerThanLog2(parallelThresholdLog2)
@@ -69,6 +78,8 @@ internal abstract class TreapMerger<
     > : TreapMerger<K, V, V, V, TK, T, T, T>() {
         context(ThresholdForker<Pair<T?, T?>>)
         override fun mergeMismatch(a: T?, b: T?): T? = a ?: b
+        context(ThresholdForker<Pair<T?, T?>>)
+        override fun shallowMergeMismatch(a: T?, b: T?): T? = a ?: b
         override fun parallelMergeTheshold(a: T?, b: T?, parallelThresholdLog2: Int): Boolean =
             a.isApproximatelySmallerThanLog2(parallelThresholdLog2) || 
             b.isApproximatelySmallerThanLog2(parallelThresholdLog2)
@@ -79,6 +90,8 @@ internal abstract class TreapMerger<
     > : TreapMerger<K, AV, BV, RV, TK, A, B, R>() {
         context(ThresholdForker<Pair<A?, B?>>)
         override fun mergeMismatch(a: A?, b: B?): R? = null
+        context(ThresholdForker<Pair<A?, B?>>)
+        override fun shallowMergeMismatch(a: A?, b: B?): R? = null
         override fun parallelMergeTheshold(a: A?, b: B?, parallelThresholdLog2: Int): Boolean =
             a.isApproximatelySmallerThanLog2(parallelThresholdLog2) || 
             b.isApproximatelySmallerThanLog2(parallelThresholdLog2)
@@ -89,34 +102,43 @@ internal abstract class TreapMerger<
     > : TreapMerger<K, AV, BV, RV, TK, A, B, R>() {
         context(ThresholdForker<Pair<A?, B?>>)
         override fun mergeMismatch(a: A?, b: B?): R? = a?.let { mergeKeepers(it, b) }
+        context(ThresholdForker<Pair<A?, B?>>)
+        override fun shallowMergeMismatch(a: A?, b: B?): R? = a?.let { shallowMerge(it, b) }
         override fun parallelMergeTheshold(a: A?, b: B?, parallelThresholdLog2: Int): Boolean =
             a.isApproximatelySmallerThanLog2(parallelThresholdLog2)
     }
 
     abstract class KeepAllMergeA<
-        @Treapable K, V, TK: TreapKey<K>, T : Treap<K, V, TK, T>
-    > : TreapMerger<K, V, V, V, TK, T, T, T>() {
-        context(ThresholdForker<Pair<T?, T?>>)
-        override fun mergeMismatch(a: T?, b: T?): T? = a?.let { mergeKeepers(it, b) } ?: b
-        override fun parallelMergeTheshold(a: T?, b: T?, parallelThresholdLog2: Int): Boolean =
+        @Treapable K, AV, BV, TK: TreapKey<K>, A : Treap<K, AV, TK, A>, B : Treap<K, BV, TK, B>
+    > : TreapMerger<K, AV, BV, BV, TK, A, B, B>() {
+        context(ThresholdForker<Pair<A?, B?>>)
+        override fun mergeMismatch(a: A?, b: B?): B? = a?.let { mergeKeepers(it, b) } ?: b
+        context(ThresholdForker<Pair<A?, B?>>)
+        override fun shallowMergeMismatch(a: A?, b: B?): B? = a?.let { shallowMerge(it, b) } ?: b
+        override fun parallelMergeTheshold(a: A?, b: B?, parallelThresholdLog2: Int): Boolean =
             a.isApproximatelySmallerThanLog2(parallelThresholdLog2)
     }
+
 
     abstract class KeepB<
         @Treapable K, AV, BV, RV, TK: TreapKey<K>, A : Treap<K, AV, TK, A>, B : Treap<K, BV, TK, B>, R : Treap<K, RV, TK, R>
     > : TreapMerger<K, AV, BV, RV, TK, A, B, R>() {
         context(ThresholdForker<Pair<A?, B?>>)
         override fun mergeMismatch(a: A?, b: B?): R? = b?.let { mergeKeepers(a, it) }
+        context(ThresholdForker<Pair<A?, B?>>)
+        override fun shallowMergeMismatch(a: A?, b: B?): R? = b?.let { shallowMerge(a, it) }
         override fun parallelMergeTheshold(a: A?, b: B?, parallelThresholdLog2: Int): Boolean =
             b.isApproximatelySmallerThanLog2(parallelThresholdLog2)
     }
 
     abstract class KeepAllMergeB<
-        @Treapable K, V, TK: TreapKey<K>, T : Treap<K, V, TK, T>
-    > : TreapMerger<K, V, V, V, TK, T, T, T>() {
-        context(ThresholdForker<Pair<T?, T?>>)
-        override fun mergeMismatch(a: T?, b: T?): T? = b?.let { mergeKeepers(a, it) } ?: a
-        override fun parallelMergeTheshold(a: T?, b: T?, parallelThresholdLog2: Int): Boolean =
+        @Treapable K, AV, BV, TK: TreapKey<K>, A : Treap<K, AV, TK, A>, B : Treap<K, BV, TK, B>
+    > : TreapMerger<K, AV, BV, AV, TK, A, B, A>() {
+        context(ThresholdForker<Pair<A?, B?>>)
+        override fun mergeMismatch(a: A?, b: B?): A? = b?.let { mergeKeepers(a, it) } ?: a
+        context(ThresholdForker<Pair<A?, B?>>)
+        override fun shallowMergeMismatch(a: A?, b: B?): A? = b?.let { shallowMerge(a, it) } ?: a
+        override fun parallelMergeTheshold(a: A?, b: B?, parallelThresholdLog2: Int): Boolean =
             b.isApproximatelySmallerThanLog2(parallelThresholdLog2)
     }
 }

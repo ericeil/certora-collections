@@ -1,6 +1,5 @@
 package com.certora.collect
 
-import com.certora.collect.TreapMap.MergeMode
 import com.certora.forkjoin.*
 import kotlinx.collections.immutable.PersistentMap
 
@@ -35,88 +34,6 @@ internal class HashTreapMap<@Treapable K, V>(
 
     override fun singleOrNull() = MapEntry(key, value).takeIf { next == null && left == null && right == null }
     override fun arbitraryOrNull(): Map.Entry<K, V>? = MapEntry(key, value)
-
-    override fun getShallowMerger(
-        mode: MergeMode,
-        merger: (K, V?, V?) -> V?
-    ): (HashTreapMap<K, V>?, HashTreapMap<K, V>?) -> HashTreapMap<K, V>? = { t1, t2 ->
-        var newPairs: KeyValuePairList.More<K, V>? = null
-        t1?.forEachPair { (k, v1) ->
-            if (mode == MergeMode.UNION || t2.shallowContainsKey(k)) {
-                val v2 = t2?.shallowGetValue(k)
-                val v = merger(k, v1, v2)
-                if (v != null) {
-                    newPairs = KeyValuePairList.More(k, v, newPairs)
-                }
-            }
-        }
-        if (mode == MergeMode.UNION) {
-            t2?.forEachPair { (k, v2) ->
-                val v1 = t1?.shallowGetValue(k)
-                if (v1 == null) {
-                    val v = merger(k, v1, v2)
-                    if (v != null) {
-                        newPairs = KeyValuePairList.More(k, v, newPairs)
-                    }
-                }
-            }
-        }
-        val firstPair = newPairs
-        when {
-            firstPair == null -> null
-            t1 != null -> {
-                val newNode = HashTreapMap(firstPair.key, firstPair.value, firstPair.next, t1.left, t1.right)
-                if (newNode.shallowEquals(t1)) { t1 } else { newNode }
-            }
-            t2 != null -> {
-                val newNode = HashTreapMap(firstPair.key, firstPair.value, firstPair.next, t2.left, t2.right)
-                if (newNode.shallowEquals(t2)) { t2 } else { newNode }
-            }
-            else -> throw IllegalArgumentException("shallow merge with no treaps")
-        }
-    }
-
-    override fun getShallowUnionMerger(
-        merger: (K, V, V) -> V
-    ): (HashTreapMap<K, V>, HashTreapMap<K, V>) -> HashTreapMap<K, V> = { t1, t2 ->
-        var newPairs: KeyValuePairList.More<K, V>? = null
-        t1.forEachPair { (k, v1) ->
-            val v = if (t2.shallowContainsKey(k)) {
-                @Suppress("UNCHECKED_CAST")
-                merger(k, v1, t2.shallowGetValue(k) as V)
-            } else {
-                v1
-            }
-            newPairs = KeyValuePairList.More(k, v, newPairs)
-        }
-        t2.forEachPair { (k, v2) ->
-            if (!t1.shallowContainsKey(k)) {
-                newPairs = KeyValuePairList.More(k, v2, newPairs)
-            }
-        }
-        newPairs!!.let { firstPair ->
-            val newNode = HashTreapMap(firstPair.key, firstPair.value, firstPair.next, t1.left, t1.right)
-            if (newNode.shallowEquals(t1)) { t1 } else { newNode }
-        }
-    }
-
-    override fun getShallowIntersectMerger(
-        merger: (K, V, V) -> V
-    ): (HashTreapMap<K, V>, HashTreapMap<K, V>) -> HashTreapMap<K, V>? = { t1, t2 ->
-        var newPairs: KeyValuePairList.More<K, V>? = null
-        t1.forEachPair { (k, v1) ->
-            if (t2.shallowContainsKey(k)) {
-                @Suppress("UNCHECKED_CAST")
-                val v2 = t2.shallowGetValue(k) as V
-                val v = merger(k, v1, v2)
-                newPairs = KeyValuePairList.More(k, v, newPairs)
-            }
-        }
-        newPairs?.let { firstPair ->
-            val newNode = HashTreapMap(firstPair.key, firstPair.value, firstPair.next, t1.left, t1.right)
-            if (newNode.shallowEquals(t1)) { t1 } else { newNode }
-        }
-    }
 
     private inline fun <U> KeyValuePairList<K, U>?.forEachPair(action: (KeyValuePairList<K, U>) -> Unit) {
         var current = this
@@ -155,7 +72,7 @@ internal class HashTreapMap<@Treapable K, V>(
 
     override fun shallowZip(that: HashTreapMap<K, V>): Sequence<Map.Entry<K, Pair<V?, V?>>> = sequence {
         forEachPair {
-            yield(MapEntry(it.key, it.value to that.shallowGetValue(it.key)))
+            yield(MapEntry(it.key, it.value to that.shallowGetValueOrNull(it.key)))
         }
         that.forEachPair {
             if (!containsKey(it.key)) {
@@ -177,13 +94,22 @@ internal class HashTreapMap<@Treapable K, V>(
 
     override fun shallowContainsKey(key: K): Boolean = (this as KeyValuePairList<K, V>).shallowContainsKey(key)
 
-    override fun shallowGetValue(key: K): V? {
+    override fun shallowGetValueOrNull(key: K): V? {
         forEachPair {
             if (it.key == key) {
                 return it.value
             }
         }
         return null
+    }
+
+    fun shallowGetValue(key: K): V {
+        forEachPair {
+            if (it.key == key) {
+                return it.value
+            }
+        }
+        error("Key $key not found")
     }
 
     override fun shallowAdd(that: HashTreapMap<K, V>): HashTreapMap<K, V> {
@@ -230,10 +156,10 @@ internal class HashTreapMap<@Treapable K, V>(
         }
     }
 
-    override fun <U> shallowUpdate(entryKey: K, toUpdate: U, merger: (V?, U) -> V?): HashTreapMap<K, V>? {
+    override fun shallowUpdate(entryKey: K, transform: (V?) -> V?): HashTreapMap<K, V>? {
         return when (this.key) {
             entryKey -> {
-                val newValue = merger(this.value, toUpdate)
+                val newValue = transform(this.value)
                 if(newValue == null) {
                     if(this.next == null) {
                         return null
@@ -253,7 +179,7 @@ internal class HashTreapMap<@Treapable K, V>(
                 var it = this.next
                 while(it != null) {
                     if(it.key == entryKey) {
-                        val upd = merger(it.value, toUpdate)
+                        val upd = transform(it.value)
                         found = true
                         if(upd != null && upd == it.value) {
                             return this
@@ -266,7 +192,7 @@ internal class HashTreapMap<@Treapable K, V>(
                     it = it.next
                 }
                 if(!found) {
-                    val deNovoMerge = merger(null, toUpdate) ?: return this
+                    val deNovoMerge = transform(null) ?: return this
                     newPairs = KeyValuePairList.More(entryKey, deNovoMerge, this.next)
                 }
                 HashTreapMap(this.key, this.value, newPairs, this.left, this.right)
@@ -340,49 +266,6 @@ internal class HashTreapMap<@Treapable K, V>(
         }
     }
 
-    override fun <U> updateValues(
-        m: Map<K, U>,
-        transform: (K, V?, U) -> V?
-    ): TreapMap<K, V> = when (m) {
-        is HashTreapMap<K, U> -> notForking(m) { self.updateValuesImpl(m, getShallowUpdater(transform)).orEmpty() }
-        else -> fallbackUpdateValues(m, transform)
-    }
-
-    override fun <U> parallelUpdateValues(
-        m: Map<K, U>,
-        parallelThresholdLog2: Int,
-        transform: (K, V?, U) -> V?
-    ): TreapMap<K, V> = when (m) {
-        is HashTreapMap<K, U> -> maybeForking(m, { it.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1) }) {
-            updateValuesImpl(m, getShallowUpdater(transform)).orEmpty()
-        }
-        else -> fallbackUpdateValues(m, transform)
-    }
-
-    override fun <U, @Treapable T : AbstractTreapMap<K, U, TreapKey.Hashed<K>, T>> getShallowUpdater(
-        transform: (K, V?, U) -> V?
-    ): (HashTreapMap<K, V>?, T) -> HashTreapMap<K, V>? = { s, t ->
-        @Suppress("NAME_SHADOWING", "UNCHECKED_CAST")
-        val t = t as? HashTreapMap<K, U> ?: error("Map type mismatch")
-        var newPairs: KeyValuePairList.More<K, V>? = null
-        t.forEachPair { (k, u) ->
-            val oldV = s?.shallowGetValue(k)
-            val newV = transform(k, oldV, u)
-            if (newV != null) {
-                newPairs = KeyValuePairList.More(k, newV, newPairs)
-            }
-        }
-        s.forEachPair { (k, v) ->
-            if (!t.shallowContainsKey(k)) {
-                newPairs = KeyValuePairList.More(k, v, newPairs)
-            }
-        }
-        newPairs?.let { firstPair ->
-            val newS = HashTreapMap(firstPair.key, firstPair.value, firstPair.next, s?.left, s?.right)
-            if (s != null && newS.shallowEquals(s)) { s } else { newS }
-        }
-    }
-    
 
     override fun shallowComputeHashCode(): Int {
         var h = 0
@@ -415,6 +298,173 @@ internal class HashTreapMap<@Treapable K, V>(
     }
 
     override val keys get() = KeySet()
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <R> KeyValuePairList.More<K, R>.toNode(a: HashTreapMap<K, *>?, b: HashTreapMap<K, *>?): HashTreapMap<K, R> {
+        val newNode = HashTreapMap(key, value, next, null, null)
+        return when {
+            a != null && newNode.shallowEquals(a as HashTreapMap<K, R>) -> a
+            b != null && newNode.shallowEquals(b as HashTreapMap<K, R>) -> b
+            else -> newNode
+        }
+    }
+
+    private fun unionMerger(merger: (K, V, V) -> V) = 
+        object : TreapMerger.KeepAllMergeIntersection<K, V, TreapKey.Hashed<K>, HashTreapMap<K, V>>() {
+            override fun shallowMerge(a: HashTreapMap<K, V>?, b: HashTreapMap<K, V>?): HashTreapMap<K, V>? {
+                a!!; b!!
+                var pairs: KeyValuePairList.More<K, V>? = null
+                a.forEachPair { (k, v) ->
+                    if (b.shallowContainsKey(k)) {
+                        merger(k, v, b.shallowGetValue(k)).let {
+                            pairs = KeyValuePairList.More(k, it, pairs)
+                        }
+                    } else {
+                        pairs = KeyValuePairList.More(k, v, pairs)
+                    }
+                }
+                b.forEachPair { (k, v) ->
+                    if (!a.shallowContainsKey(k)) {
+                        pairs = KeyValuePairList.More(k, v, pairs)
+                    }
+                }
+                return pairs!!.toNode(a, b)
+            }
+        }
+
+    override fun union(m: Map<K, V>, merger: (K, V, V) -> V): TreapMap<K, V> = when (m) {
+        is HashTreapMap<K, V> -> unionMerger(merger).merge(this, m).orEmpty()
+        else -> fallbackUnion(m, merger)
+    }
+
+    override fun parallelUnion(m: Map<K, V>, parallelThresholdLog2: Int, merger: (K, V, V) -> V): TreapMap<K, V> = when (m) {
+        is HashTreapMap<K, V> -> unionMerger(merger).parallelMerge(this, m, parallelThresholdLog2).orEmpty()
+        else -> fallbackUnion(m, merger)
+    }
+
+    private fun <U, R> intersectMerger(merger: (K, V, U) -> R) =
+        object : TreapMerger.KeepIntersection<K, V, U, R, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>, HashTreapMap<K, R>>() {
+            override fun shallowMerge(a: HashTreapMap<K, V>?, b: HashTreapMap<K, U>?): HashTreapMap<K, R>? {
+                a!!; b!!
+                var pairs: KeyValuePairList.More<K, R>? = null
+                a.forEachPair { (k, v1) ->
+                    if (b.shallowContainsKey(k)) {
+                        val v2 = b.shallowGetValue(k)
+                        merger(k, v1, v2).let {
+                            pairs = KeyValuePairList.More(k, it, pairs)
+                        }
+                    }
+                }
+                return pairs?.toNode(a, b)
+            }
+        }
+
+    override fun <U, R> intersect(m: Map<K, U>, merger: (K, V, U) -> R): TreapMap<K, R> = when (m) {
+        is HashTreapMap<K, U> -> intersectMerger(merger).merge(this, m).orEmpty()
+        else -> fallbackIntersect(m, merger)
+    }
+
+    override fun <U, R> parallelIntersect(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V, U) -> R): TreapMap<K, R> = when (m) {
+        is HashTreapMap<K, U> -> intersectMerger(merger).parallelMerge(this, m, parallelThresholdLog2).orEmpty()
+        else -> fallbackIntersect(m, merger)
+    }
+
+
+    private fun <U> updateValuesMerger(transform: (K, V?, U) -> V?) =
+        object : TreapMerger.KeepAllMergeB<K, V, U, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>>() {
+            override fun shallowMerge(a: HashTreapMap<K, V>?, b: HashTreapMap<K, U>?): HashTreapMap<K, V>? {
+                b!!
+                var pairs: KeyValuePairList.More<K, V>? = null
+                a?.forEachPair { (k, v) ->
+                    if (b.shallowContainsKey(k)) {
+                        transform(k, v, b.shallowGetValue(k))?.let {
+                            pairs = KeyValuePairList.More(k, it, pairs)
+                        }
+                    } else {
+                        pairs = KeyValuePairList.More(k, v, pairs)
+                    }
+                }
+                b.forEachPair { (k, v) ->
+                    if (a?.shallowContainsKey(k) != true) {
+                        transform(k, null, v)?.let {
+                            pairs = KeyValuePairList.More(k, it, pairs)
+                        }
+                    }
+                }
+                return pairs?.toNode(a, b)
+            }
+        }
+
+    private fun <U, R> mergeMerger(merger: (K, V?, U?) -> R?) =
+        object : TreapMerger.MergeAll<K, V, U, R, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>, HashTreapMap<K, R>>() {
+            override fun shallowMerge(a: HashTreapMap<K, V>?, b: HashTreapMap<K, U>?): HashTreapMap<K, R>? {
+                var pairs: KeyValuePairList.More<K, R>? = null
+                a?.forEachPair { (k, v) ->
+                    merger(k, v, b?.shallowGetValueOrNull(k))?.let {
+                        pairs = KeyValuePairList.More(k, it, pairs)
+                    }
+                }
+                b?.forEachPair { (k, v) ->
+                    if (a?.shallowContainsKey(k) != true) {
+                        merger(k, null, v)?.let {
+                            pairs = KeyValuePairList.More(k, it, pairs)
+                        }
+                    }
+                }
+                return pairs?.toNode(a, b)
+            }
+        }
+
+    override fun <U, R> merge(m: Map<K, U>, merger: (K, V?, U?) -> R?): TreapMap<K, R> = when (m) {
+        is HashTreapMap<K, U> -> mergeMerger<U, R>(merger).merge(this, m).orEmpty()
+        else -> fallbackMerge(m, merger)
+    }
+    override fun <U, R> parallelMerge(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V?, U?) -> R?): TreapMap<K, R> = when (m) {
+        is HashTreapMap<K, U> -> mergeMerger<U, R>(merger).parallelMerge(this, m, parallelThresholdLog2).orEmpty()
+        else -> fallbackMerge(m, merger)
+    }
+
+    private fun <U, R> mergeIntersectionMerger(merger: (K, V, U) -> R?) =
+        object : TreapMerger.KeepIntersection<K, V, U, R, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>, HashTreapMap<K, R>>() {
+            override fun shallowMerge(a: HashTreapMap<K, V>?, b: HashTreapMap<K, U>?): HashTreapMap<K, R>? {
+                var pairs: KeyValuePairList.More<K, R>? = null
+                a?.forEachPair { (k, v1) ->
+                    if (b?.shallowContainsKey(k) == true) {
+                        val v2 = b.shallowGetValue(k)
+                        merger(k, v1, v2)?.let {
+                            pairs = KeyValuePairList.More(k, it, pairs)
+                        }
+                    }
+                }
+                return pairs?.toNode(a, b)
+            }
+        }
+
+    override fun <U, R> mergeIntersection(m: Map<K, U>, merger: (K, V, U) -> R?): TreapMap<K, R> = when (m) {
+        is HashTreapMap<K, U> -> mergeIntersectionMerger(merger).merge(this, m).orEmpty()
+        else -> fallbackMergeIntersection(m, merger)
+    }
+    override fun <U, R> parallelMergeIntersection(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V, U) -> R?): TreapMap<K, R> = when (m) {
+        is HashTreapMap<K, U> -> mergeIntersectionMerger(merger).parallelMerge(this, m, parallelThresholdLog2).orEmpty()
+        else -> fallbackMergeIntersection(m, merger)
+    }
+
+    override fun <U> updateValues(
+        m: Map<K, U>,
+        transform: (K, V?, U) -> V?
+    ): TreapMap<K, V> = when (m) {
+        is HashTreapMap<K, U> -> updateValuesMerger(transform).merge(this, m).orEmpty()
+        else -> fallbackUpdateValues(m, transform)
+    }
+
+    override fun <U> parallelUpdateValues(
+        m: Map<K, U>,
+        parallelThresholdLog2: Int,
+        transform: (K, V?, U) -> V?
+    ): TreapMap<K, V> = when (m) {
+        is HashTreapMap<K, U> -> updateValuesMerger(transform).parallelMerge(this, m, parallelThresholdLog2).orEmpty()
+        else -> fallbackUpdateValues(m, transform)
+    }
 }
 
 internal interface KeyValuePairList<K, V> {
