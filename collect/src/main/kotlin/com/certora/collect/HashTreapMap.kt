@@ -310,7 +310,7 @@ internal class HashTreapMap<@Treapable K, V>(
     }
 
     private fun unionMerger(merger: (K, V, V) -> V) = 
-        object : TreapMerger.KeepAllMergeIntersection<K, V, TreapKey.Hashed<K>, HashTreapMap<K, V>>() {
+        object : TreapMerger.KeepAllMergeIntersection<K, TreapKey.Hashed<K>, HashTreapMap<K, V>>() {
             override fun shallowMerge(a: HashTreapMap<K, V>?, b: HashTreapMap<K, V>?): HashTreapMap<K, V>? {
                 a!!; b!!
                 var pairs: KeyValuePairList.More<K, V>? = null
@@ -343,7 +343,7 @@ internal class HashTreapMap<@Treapable K, V>(
     }
 
     private fun <U, R> intersectMerger(merger: (K, V, U) -> R) =
-        object : TreapMerger.KeepIntersection<K, V, U, R, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>, HashTreapMap<K, R>>() {
+        object : TreapMerger.KeepIntersection<K, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>, HashTreapMap<K, R>>() {
             override fun shallowMerge(a: HashTreapMap<K, V>?, b: HashTreapMap<K, U>?): HashTreapMap<K, R>? {
                 a!!; b!!
                 var pairs: KeyValuePairList.More<K, R>? = null
@@ -371,7 +371,7 @@ internal class HashTreapMap<@Treapable K, V>(
 
 
     private fun <U> updateValuesMerger(transform: (K, V?, U) -> V?) =
-        object : TreapMerger.KeepAllMergeB<K, V, U, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>>() {
+        object : TreapMerger.KeepAllMergeB<K, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>>() {
             override fun shallowMerge(a: HashTreapMap<K, V>?, b: HashTreapMap<K, U>?): HashTreapMap<K, V>? {
                 b!!
                 var pairs: KeyValuePairList.More<K, V>? = null
@@ -396,7 +396,7 @@ internal class HashTreapMap<@Treapable K, V>(
         }
 
     private fun <U, R> mergeMerger(merger: (K, V?, U?) -> R?) =
-        object : TreapMerger.MergeAll<K, V, U, R, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>, HashTreapMap<K, R>>() {
+        object : TreapMerger.MergeAll<K, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>, HashTreapMap<K, R>>() {
             override fun shallowMerge(a: HashTreapMap<K, V>?, b: HashTreapMap<K, U>?): HashTreapMap<K, R>? {
                 var pairs: KeyValuePairList.More<K, R>? = null
                 a?.forEachPair { (k, v) ->
@@ -425,7 +425,7 @@ internal class HashTreapMap<@Treapable K, V>(
     }
 
     private fun <U, R> mergeIntersectionMerger(merger: (K, V, U) -> R?) =
-        object : TreapMerger.KeepIntersection<K, V, U, R, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>, HashTreapMap<K, R>>() {
+        object : TreapMerger.KeepIntersection<K, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapMap<K, U>, HashTreapMap<K, R>>() {
             override fun shallowMerge(a: HashTreapMap<K, V>?, b: HashTreapMap<K, U>?): HashTreapMap<K, R>? {
                 var pairs: KeyValuePairList.More<K, R>? = null
                 a?.forEachPair { (k, v1) ->

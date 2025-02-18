@@ -11,7 +11,7 @@ import kotlinx.collections.immutable.ImmutableSet
 internal sealed class AbstractTreapMap<@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>>(
     left: S?,
     right: S?
-) : TreapMap<K, V>, Treap<K, V, TK, S>(left, right) {
+) : TreapMap<K, V>, Treap<K, TK, S>(left, right) {
 
     /**
         Derived classes override to create an apropriate node containing the given entry.

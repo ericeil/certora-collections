@@ -158,7 +158,7 @@ internal class SortedTreapMap<@Treapable K, V>(
     }
 
     private fun unionMerger(merger: (K, V, V) -> V) = 
-        object : TreapMerger.KeepAllMergeIntersection<K, V, TreapKey.Sorted<K>, SortedTreapMap<K, V>>() {
+        object : TreapMerger.KeepAllMergeIntersection<K, TreapKey.Sorted<K>, SortedTreapMap<K, V>>() {
             override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapMap<K, V>?): SortedTreapMap<K, V>? {
                 a!!; b!!
                 val k = a.key
@@ -176,7 +176,7 @@ internal class SortedTreapMap<@Treapable K, V>(
     }
 
     private fun <U, R> intersectMerger(merger: (K, V, U) -> R) =
-        object : TreapMerger.KeepIntersection<K, V, U, R, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>, SortedTreapMap<K, R>>() {
+        object : TreapMerger.KeepIntersection<K, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>, SortedTreapMap<K, R>>() {
             override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapMap<K, U>?): SortedTreapMap<K, R>? {
                 a!!; b!!
                 val k = a.key
@@ -195,7 +195,7 @@ internal class SortedTreapMap<@Treapable K, V>(
 
 
     private fun <U> updateValuesMerger(transform: (K, V?, U) -> V?) =
-        object : TreapMerger.KeepAllMergeB<K, V, U, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>>() {
+        object : TreapMerger.KeepAllMergeB<K, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>>() {
             override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapMap<K, U>?): SortedTreapMap<K, V>? {
                 val k = b!!.key
                 return transform(k, a?.value, b.value)?.toNode(a, b)
@@ -219,7 +219,7 @@ internal class SortedTreapMap<@Treapable K, V>(
     }
 
     private fun <U, R> mergeMerger(merger: (K, V?, U?) -> R?) =
-        object : TreapMerger.MergeAll<K, V, U, R, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>, SortedTreapMap<K, R>>() {
+        object : TreapMerger.MergeAll<K, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>, SortedTreapMap<K, R>>() {
             override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapMap<K, U>?): SortedTreapMap<K, R>? {                
                 val k = a?.key ?: b!!.key
                 return merger(k, a?.value, b?.value)?.toNode(a, b)
@@ -236,7 +236,7 @@ internal class SortedTreapMap<@Treapable K, V>(
     }
 
     private fun <U, R> mergeIntersectionMerger(merger: (K, V, U) -> R?) =
-        object : TreapMerger.KeepIntersection<K, V, U, R, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>, SortedTreapMap<K, R>>() {
+        object : TreapMerger.KeepIntersection<K, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapMap<K, U>, SortedTreapMap<K, R>>() {
             override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapMap<K, U>?): SortedTreapMap<K, R>? {
                 a!!; b!!
                 val k = a.key 
