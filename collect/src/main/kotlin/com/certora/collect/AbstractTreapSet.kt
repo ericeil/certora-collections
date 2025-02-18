@@ -183,7 +183,7 @@ internal infix fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.treapUnion(that
     }
 }
 
-private fun <@Treapable E, S : AbstractTreapSet<E, S>> unionMerge(higher: AbstractTreapSet<E, S>, lower: AbstractTreapSet<E, S>) =
+private fun <@Treapable E, S : AbstractTreapSet<E, S>> unionMerge(higher: S, lower: S) =
     // Note that the "higher" key can not occur in "lower", because if it did it wouldn't have a higher priority. We
     // don't need to worry about the split's `duplicate` field.
     lower.split(higher).let { lowerSplit ->
@@ -217,7 +217,7 @@ internal fun <@Treapable E, S : AbstractTreapSet<E, S>> S?.intersectWith(that: S
     }
 }
 
-private fun <@Treapable E, S : AbstractTreapSet<E, S>> intersectMerge(higher: AbstractTreapSet<E, S>, lower: AbstractTreapSet<E, S>) =
+private fun <@Treapable E, S : AbstractTreapSet<E, S>> intersectMerge(higher: S, lower: S) =
     // Note that the "higher" key can not occur in "lower", because if it did it wouldn't have a higher priority. We
     // don't need to worry about the split's `duplicate` field.
     lower.split(higher).let { lowerSplit ->

@@ -151,8 +151,9 @@ internal abstract class Treap<@Treapable T, S : Treap<T, S>>(
     Splits this treap into two treaps, one with keys less than `key`, and one greater.  Returns both, and if there was a
     node with the same key, returns that too.  This is a basic building block of other Treap operations.
  */
-internal fun <@Treapable T, S : Treap<T, S>> Treap<T, S>?.split(key: TreapKey<T>): Split<T, S> = when {
+internal fun <@Treapable T, S : Treap<T, S>> S?.split(key: TreapKey<T>?): Split<T, S> = when {
     this == null -> Split<T, S>(left = null, right = null, duplicate = null)
+    key == null -> Split<T, S>(left = left, right = right, duplicate = this)
     else -> {
         val c = this.compareKeyTo(key)
         when {
@@ -174,7 +175,9 @@ internal fun <@Treapable T, S : Treap<T, S>> Treap<T, S>?.split(key: TreapKey<T>
         }
     }
 }
-internal class Split<@Treapable T, S : Treap<T, S>>(var left: S?, var right: S?, var duplicate: S?) {
+
+@Suppress("DataClassShouldBeImmutable") // This is for performance
+internal data class Split<@Treapable T, S : Treap<T, S>>(var left: S?, var right: S?, var duplicate: S?) {
     override fun toString(): String = "Split(left=$left, right=$right, duplicate=$duplicate)"
 }
 
@@ -197,7 +200,7 @@ internal infix fun <@Treapable T, S : Treap<T, S>> S?.join(greater: S?): S? = wh
  */
 internal fun <@Treapable T, S : Treap<T, S>> S?.add(that: S): S = add(that, that.precompute())
 
-private fun <@Treapable T, S : Treap<T, S>> Treap<T, S>?.add(that: S, thatKey: TreapKey<T>): S = when {
+private fun <@Treapable T, S : Treap<T, S>> S?.add(that: S, thatKey: TreapKey<T>): S = when {
     that.left != null || that.right != null -> throw IllegalArgumentException("add requires a single treap node")
     this == null -> that
     else -> {
