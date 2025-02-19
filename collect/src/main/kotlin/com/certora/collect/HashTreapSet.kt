@@ -23,6 +23,8 @@ internal class HashTreapSet<@Treapable E>(
         return h
     }
 
+    override val treapPriority = super<TreapKey.Hashed>.treapPriority
+
     override fun E.toTreapKey() = TreapKey.Hashed.fromKey(this)
     override fun new(element: E): HashTreapSet<E> = HashTreapSet(element)
 

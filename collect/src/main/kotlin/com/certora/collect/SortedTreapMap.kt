@@ -23,6 +23,8 @@ internal class SortedTreapMap<@Treapable K, V>(
         return h
     }
 
+    override val treapPriority = super<TreapKey.Sorted>.treapPriority
+
     override fun K.toTreapKey() = TreapKey.Sorted.fromKey(this)
 
     override fun new(key: K, value: V): SortedTreapMap<K, V> = SortedTreapMap(key, value)

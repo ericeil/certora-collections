@@ -21,6 +21,8 @@ internal class SortedTreapSet<@Treapable E>(
         return h
     }
 
+    override val treapPriority = super<TreapKey.Sorted>.treapPriority
+
     override fun E.toTreapKey() = TreapKey.Sorted.fromKey(this)
     override fun new(element: E): SortedTreapSet<E> = SortedTreapSet(element)
 

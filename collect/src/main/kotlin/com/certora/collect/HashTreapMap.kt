@@ -28,6 +28,8 @@ internal class HashTreapMap<@Treapable K, V>(
         return h
     }
 
+    override val treapPriority = super<TreapKey.Hashed>.treapPriority 
+
     override fun K.toTreapKey() = TreapKey.Hashed.fromKey(this)
     override fun new(key: K, value: V): HashTreapMap<K, V> = HashTreapMap(key, value)
 
