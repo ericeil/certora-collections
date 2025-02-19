@@ -157,6 +157,12 @@ internal class SortedTreapMap<@Treapable K, V>(
         else -> SortedTreapMap(a?.key ?: b!!.key, this, null, null)
     }
 
+    @Suppress("UNCHECKED_CAST")
+    private fun <R> R.toNode(a: SortedTreapMap<K, *>?, b: SortedTreapSet<K>?): SortedTreapMap<K, R> = when {
+        a != null && this === a.value -> a as SortedTreapMap<K, R>
+        else -> SortedTreapMap(a?.key ?: b!!.treapKey, this, null, null)
+    }
+
     private fun unionMerger(merger: (K, V, V) -> V) = 
         object : TreapMerger.KeepAllMergeIntersection<K, TreapKey.Sorted<K>, SortedTreapMap<K, V>>() {
             override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapMap<K, V>?): SortedTreapMap<K, V>? {
@@ -251,5 +257,22 @@ internal class SortedTreapMap<@Treapable K, V>(
     override fun <U, R> parallelMergeIntersection(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V, U) -> R?): TreapMap<K, R> = when (m) {
         is SortedTreapMap<K, U> -> mergeIntersectionMerger(merger).parallelMerge(this, m, parallelThresholdLog2).orEmpty()
         else -> fallbackMergeIntersection(m, merger)
+    }
+
+    private fun <R> lookupMerger(transform: (K, V?) -> R) =
+        object : TreapMerger.KeepB<K, TreapKey.Sorted<K>, SortedTreapMap<K, V>, SortedTreapSet<K>, SortedTreapMap<K, R>>() {
+            override fun shallowMerge(a: SortedTreapMap<K, V>?, b: SortedTreapSet<K>?): SortedTreapMap<K, R>? {
+                val k = b!!.treapKey
+                return transform(k, a?.value).toNode(a, b)
+            }
+        }
+
+    override fun <R> lookup(keys: Set<K>, transform: (K, V?) -> R): TreapMap<K, R> = when (keys) {
+        is SortedTreapSet<K> -> lookupMerger(transform).merge(this, keys).orEmpty()
+        else -> fallbackLookup(keys, transform)
+    }
+    override fun <R> parallelLookup(keys: Set<K>, parallelThresholdLog2: Int, transform: (K, V?) -> R): TreapMap<K, R> = when (keys) {
+        is SortedTreapSet<K> -> lookupMerger(transform).parallelMerge(this, keys, parallelThresholdLog2).orEmpty()
+        else -> fallbackLookup(keys, transform)
     }
 }

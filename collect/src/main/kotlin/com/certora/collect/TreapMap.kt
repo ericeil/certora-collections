@@ -211,6 +211,24 @@ public sealed interface TreapMap<K, V> : PersistentMap<K, V> {
         transform: (V?) -> V?
     ): TreapMap<K, V>
 
+    public fun <R> lookup(
+        keys: Set<K>,
+        transform: (K, V?) -> R
+    ): TreapMap<K, R>
+
+    public fun lookup(keys: Set<K>): TreapMap<K, V?> = lookup(keys) { _, v -> v }
+
+
+    public fun <R> parallelLookup(
+        keys: Set<K>,
+        parallelThresholdLog2: Int = 5,
+        transform: (K, V?) -> R
+    ): TreapMap<K, R>
+
+    public fun parallelLookup(keys: Set<K>, parallelThresholdLog2: Int = 5): TreapMap<K, V?> =
+        parallelLookup(keys) { _, v -> v }
+
+
     /**
         Produces a sequence from the entries of this map and another map.  For each key, the result is an entry mapping
         the key to a pair of values.  Each value may be null, if the key is not present in the corresponding map.

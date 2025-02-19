@@ -463,4 +463,10 @@ internal fun <@Treapable K, V, U, R> TreapMap<K, V>.fallbackMergeIntersection(m:
     return r
 }
 
-
+internal fun <@Treapable K, V, R> TreapMap<K, V>.fallbackLookup(keys: Set<K>, transform: (K, V?) -> R): TreapMap<K, R> {
+    var r = treapMapOf<K, R>()    
+    for (k in keys) {
+        r += k to transform(k, this[k])
+    }
+    return r
+}

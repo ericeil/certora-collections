@@ -449,6 +449,32 @@ internal class HashTreapMap<@Treapable K, V>(
         else -> fallbackMergeIntersection(m, merger)
     }
 
+    private fun <R> lookupMerger(transform: (K, V?) -> R) =
+        object : TreapMerger.KeepB<K, TreapKey.Hashed<K>, HashTreapMap<K, V>, HashTreapSet<K>, HashTreapMap<K, R>>() {
+            override fun shallowMerge(a: HashTreapMap<K, V>?, b: HashTreapSet<K>?): HashTreapMap<K, R>? {
+                b!!
+                var pairs: KeyValuePairList.More<K, R>? = null
+                a?.forEachPair { (k, v) ->
+                    if (b.shallowContains(k)) {
+                        transform(k, v).let {
+                            pairs = KeyValuePairList.More(k, it, pairs)
+                        }
+                    }
+                }
+                return pairs?.toNode(a, null)
+            }
+        }
+
+    override fun <R> lookup(keys: Set<K>, transform: (K, V?) -> R): TreapMap<K, R> = when (keys) {
+        is HashTreapSet<K> -> lookupMerger(transform).merge(this, keys).orEmpty()
+        else -> fallbackLookup(keys, transform)
+    }
+    override fun <R> parallelLookup(keys: Set<K>, parallelThresholdLog2: Int, transform: (K, V?) -> R): TreapMap<K, R> = when (keys) {
+        is HashTreapSet<K> -> lookupMerger(transform).parallelMerge(this, keys, parallelThresholdLog2).orEmpty()
+        else -> fallbackLookup(keys, transform)
+    }
+
+
     override fun <U> updateValues(
         m: Map<K, U>,
         transform: (K, V?, U) -> V?

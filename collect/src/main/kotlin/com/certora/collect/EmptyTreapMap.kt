@@ -62,8 +62,12 @@ internal class EmptyTreapMap<@Treapable K, V> private constructor() : TreapMap<K
 
     override fun <U, R> merge(m: Map<K, U>, merger: (K, V?, U?) -> R?): TreapMap<K, R> = fallbackMerge(m, merger)
     override fun <U, R> parallelMerge(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V?, U?) -> R?): TreapMap<K, R> = fallbackMerge(m, merger)
+
     override fun <U, R> mergeIntersection(m: Map<K, U>, merger: (K, V, U) -> R?): TreapMap<K, R> = fallbackMergeIntersection(m, merger)
     override fun <U, R> parallelMergeIntersection(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V, U) -> R?): TreapMap<K, R> = fallbackMergeIntersection(m, merger)
+
+    override fun <R> lookup(keys: Set<K>, transform: (K, V?) -> R): TreapMap<K, R> = fallbackLookup(keys, transform)
+    override fun <R> parallelLookup(keys: Set<K>, parallelThresholdLog2: Int, transform: (K, V?) -> R): TreapMap<K, R> = fallbackLookup(keys, transform)
 
     override fun zip(m: Map<out K, V>): Sequence<Map.Entry<K, Pair<V?, V?>>> =
         m.asSequence().map { MapEntry(it.key, null to it.value) }
