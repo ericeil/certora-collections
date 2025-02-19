@@ -20,7 +20,13 @@ internal class HashTreapMap<@Treapable K, V>(
     right: HashTreapMap<K, V>? = null
 ) : AbstractTreapMap<K, V, TreapKey.Hashed<K>, HashTreapMap<K, V>>(left, right), TreapKey.Hashed<K>, KeyValuePairList<K, V> {
 
-    override fun hashCode() = computeHashCode()
+    override fun hashCode(): Int {
+        var h = 0
+        forEachPair { (k, v) -> h += AbstractMapEntry.hashCode(k, v) }
+        left?.let { h += it.hashCode() }
+        right?.let { h += it.hashCode() }
+        return h
+    }
 
     override fun K.toTreapKey() = TreapKey.Hashed.fromKey(this)
     override fun new(key: K, value: V): HashTreapMap<K, V> = HashTreapMap(key, value)
@@ -264,13 +270,6 @@ internal class HashTreapMap<@Treapable K, V>(
                 }
             }
         }
-    }
-
-
-    override fun shallowComputeHashCode(): Int {
-        var h = 0
-        forEachPair { (k, v) -> h += AbstractMapEntry.hashCode(k, v) }
-        return h
     }
 
     override fun <R : Any> shallowMapReduce(map: (K, V) -> R, reduce: (R, R) -> R): R {

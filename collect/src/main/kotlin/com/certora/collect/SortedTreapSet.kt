@@ -14,7 +14,12 @@ internal class SortedTreapSet<@Treapable E>(
 
     init { check(treapKey is Comparable<*>?) { "SortedTreapSet elements must be Comparable" } }
 
-    override fun hashCode(): Int = computeHashCode()
+    override fun hashCode(): Int {
+        var h = treapKey.hashCode() 
+        left?.let { h += it.hashCode() }
+        right?.let { h += it.hashCode() }
+        return h
+    }
 
     override fun E.toTreapKey() = TreapKey.Sorted.fromKey(this)
     override fun new(element: E): SortedTreapSet<E> = SortedTreapSet(element)
@@ -49,7 +54,6 @@ internal class SortedTreapSet<@Treapable E>(
     override fun shallowIntersect(that: SortedTreapSet<E>) = this
     override fun shallowRemove(element: E): SortedTreapSet<E>? = null
     override fun shallowRemoveAll(predicate: (E) -> Boolean): SortedTreapSet<E>? = this.takeIf { !predicate(treapKey) }
-    override fun shallowComputeHashCode(): Int = treapKey.hashCode()
     override fun singleOrNull(): E? = treapKey.takeIf { left == null && right == null }
     override fun single(): E {
         if (left != null || right != null) {

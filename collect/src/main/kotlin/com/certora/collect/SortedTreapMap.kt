@@ -16,7 +16,12 @@ internal class SortedTreapMap<@Treapable K, V>(
 
     init { check(key is Comparable<*>?) { "SortedTreapMap keys must be Comparable" } }
 
-    override fun hashCode() = computeHashCode()
+    override fun hashCode(): Int {
+        var h = AbstractMapEntry.hashCode(key, value)
+        left?.let { h += it.hashCode() }
+        right?.let { h += it.hashCode() }
+        return h
+    }
 
     override fun K.toTreapKey() = TreapKey.Sorted.fromKey(this)
 
@@ -60,7 +65,6 @@ internal class SortedTreapMap<@Treapable K, V>(
     override fun shallowRemoveEntry(key: K, value: V): SortedTreapMap<K, V>? = this.takeIf { this.value != value }
     override fun shallowGetValueOrNull(key: K): V = value
     override fun shallowEquals(that: SortedTreapMap<K, V>): Boolean = this.value == that.value
-    override fun shallowComputeHashCode(): Int = AbstractMapEntry.hashCode(key, value)
 
     override fun copyWith(left: SortedTreapMap<K, V>?, right: SortedTreapMap<K, V>?) = SortedTreapMap(key, value, left, right)
 

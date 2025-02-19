@@ -102,7 +102,6 @@ internal abstract class Treap<@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>
      */
     abstract infix fun shallowAdd(that: S): S
     abstract fun shallowRemove(element: K): S?
-    abstract fun shallowComputeHashCode(): Int
 
     /**
         Produces a sequence of all nodes in this Treap, which we use at a higher level to enumerate elements/entries.
@@ -264,11 +263,6 @@ internal fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.deepEquals(
     this.compareKeyTo(that) != 0 -> false
     !this.shallowEquals(that) -> false
     else -> this.left.deepEquals(that.left) && this.right.deepEquals(that.right)
-}
-
-internal fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.computeHashCode(): Int = when {
-    this == null -> 0
-    else -> shallowComputeHashCode() + left.computeHashCode() + right.computeHashCode()
 }
 
 /**

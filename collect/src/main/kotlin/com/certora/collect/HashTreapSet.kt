@@ -15,7 +15,13 @@ internal class HashTreapSet<@Treapable E>(
     right: HashTreapSet<E>? = null
 ) : AbstractTreapSet<E, TreapKey.Hashed<E>, HashTreapSet<E>>(left, right), TreapKey.Hashed<E>, ElementList<E> {
 
-    override fun hashCode(): Int = computeHashCode()
+    override fun hashCode(): Int {
+        var h = 0
+        forEachNodeElement { h += it.hashCode() }
+        left?.let { h += it.hashCode() }
+        right?.let { h += it.hashCode() }
+        return h
+    }
 
     override fun E.toTreapKey() = TreapKey.Hashed.fromKey(this)
     override fun new(element: E): HashTreapSet<E> = HashTreapSet(element)
@@ -213,12 +219,6 @@ internal class HashTreapSet<@Treapable E>(
         } else {
             return this
         }
-    }
-
-    override fun shallowComputeHashCode(): Int {
-        var h = 0
-        forEachNodeElement { h += it.hashCode() }
-        return h
     }
 
     override fun iterator(): Iterator<E> = sequence {
