@@ -1,5 +1,6 @@
 package com.certora.collect
 
+import com.certora.collect.TreapMap.MergeMode
 import com.certora.forkjoin.*
 import kotlinx.collections.immutable.ImmutableCollection
 import kotlinx.collections.immutable.ImmutableSet
@@ -8,10 +9,10 @@ import kotlinx.collections.immutable.ImmutableSet
     Base class for TreapMap implementations.  Provides the Map operations; derived classes deal with type-specific
     behavior such as hash collisions.  See [Treap] for an overview of all of this.
  */
-internal sealed class AbstractTreapMap<@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>>(
+internal sealed class AbstractTreapMap<@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>>(
     left: S?,
     right: S?
-) : TreapMap<K, V>, Treap<K, TK, S>(left, right) {
+) : TreapMap<K, V>, Treap<K, S>(left, right) {
 
     /**
         Derived classes override to create an apropriate node containing the given entry.
@@ -23,7 +24,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, TK: TreapKey<K>, @Treapa
         as 'this' AbstractTreapMap.  For example, if this is a HashTreapMap, and so is the supplied collection.
         Otherwise returns null.
      */
-    abstract fun Map<out K, V>.toTreapMapOrNull(): S?
+    abstract fun Map<out K, V>.toTreapMapOrNull(): AbstractTreapMap<K, V, S>?
 
     /**
         Given a map, calls the supplied `action` if the collection is a Treap of the same type as this Treap, otherwise
@@ -57,11 +58,18 @@ internal sealed class AbstractTreapMap<@Treapable K, V, TK: TreapKey<K>, @Treapa
     /**
         Gets the value of the entry with the given key, *in this node only*.
      */
-    abstract fun shallowGetValueOrNull(key: K): V?
+    abstract fun shallowGetValue(key: K): V?
 
     abstract fun shallowRemoveEntry(key: K, value: V): S?
-    abstract fun shallowUpdate(entryKey: K, transform: (V?) -> V?): S?
+    abstract fun <U> shallowUpdate(entryKey: K, toUpdate: U, merger: (V?, U) -> V?): S?
     abstract fun <R : Any> shallowMapReduce(map: (K, V) -> R, reduce: (R, R) -> R): R
+
+    /**
+        Applies a merge function to all entries in this Treap node.
+     */
+    abstract fun getShallowMerger(mode: MergeMode, merger: (K, V?, V?) -> V?): (S?, S?) -> S?
+    abstract fun getShallowUnionMerger(merger: (K, V, V) -> V): (S, S) -> S
+    abstract fun getShallowIntersectMerger(merger: (K, V, V) -> V): (S, S) -> S?
 
     private fun containsEntry(entry: Map.Entry<K, V>): Boolean {
         val key = entry.key
@@ -94,7 +102,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, TK: TreapKey<K>, @Treapa
         return when {
             otherMap == null -> false
             otherMap === this -> true
-            otherMap.isEmpty() -> false // NB AbstractTreapMap always contains at least one entry            
+            otherMap.isEmpty() -> false // NB AbstractTreapMap always contains at least one entry
             else -> otherMap.useAsTreap(
                 { otherTreap -> this.self.deepEquals(otherTreap) },
                 { other.size == this.size && other.entries.all { this.containsEntry(it) }}
@@ -114,7 +122,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, TK: TreapKey<K>, @Treapa
     override fun containsValue(value: V) = values.contains(value)
 
     override fun get(key: K): V? =
-        key.toTreapKey()?.let { self.find(it) }?.shallowGetValueOrNull(key)
+        key.toTreapKey()?.let { self.find(it) }?.shallowGetValue(key)
 
     override fun putAll(m: Map<out K, V>): TreapMap<K, V> =
         m.entries.fold(this as TreapMap<K, V>) { t, e -> t.put(e.key, e.value) }
@@ -143,12 +151,106 @@ internal sealed class AbstractTreapMap<@Treapable K, V, TK: TreapKey<K>, @Treapa
             override operator fun iterator() = entrySequence().map { it.value }.iterator()
         }
 
+    override fun union(m: Map<K, V>, merger: (K, V, V) -> V): TreapMap<K, V> =
+        m.useAsTreap(
+            { otherTreap -> self.unionWith(otherTreap, getShallowUnionMerger(merger)) ?: clear() },
+            { fallbackUnion(m, merger) }
+        )
+
+    override fun parallelUnion(m: Map<K, V>, parallelThresholdLog2: Int, merger: (K, V, V) -> V): TreapMap<K, V> =
+        m.useAsTreap(
+            { otherTreap -> self.parallelUnionWith(otherTreap, parallelThresholdLog2, getShallowUnionMerger(merger)) ?: clear() },
+            { fallbackUnion(m, merger) }
+        )
+
+    private fun fallbackUnion(m: Map<K, V>, merger: (K, V, V) -> V): TreapMap<K, V> {
+        var newThis = this as TreapMap<K, V>
+        for ((k, v) in m.entries) {
+            if (k in this) {
+                newThis = newThis + (k to merger(k, this[k]!!, v))
+            } else {
+                newThis = newThis + (k to v)
+            }
+        }
+        return newThis
+    }
+
+    override fun intersect(m: Map<K, V>, merger: (K, V, V) -> V): TreapMap<K, V> =
+        m.useAsTreap(
+            { otherTreap -> self.intersectWith(otherTreap, getShallowIntersectMerger(merger)) ?: clear() },
+            { fallbackIntersect(m, merger) }
+        )
+
+    override fun parallelIntersect(m: Map<K, V>, parallelThresholdLog2: Int, merger: (K, V, V) -> V): TreapMap<K, V> =
+        m.useAsTreap(
+            { otherTreap -> self.parallelIntersectWith(otherTreap, parallelThresholdLog2, getShallowIntersectMerger(merger)) ?: clear() },
+            { fallbackIntersect(m, merger) }
+        )
+
+    private fun fallbackIntersect(m: Map<K, V>, merger: (K, V, V) -> V): TreapMap<K, V> {
+        var newThis = clear()
+        for ((k, v) in m.entries) {
+            if (k in this) {
+                newThis = newThis + (k to merger(k, this[k]!!, v))
+            }
+        }
+        return newThis
+    }
+
+    /**
+        Merges the entries in `m` with the entries in this AbstractTreapMap, applying the "merger" function to get the
+        new values for each key.
+     */
+    override fun merge(m: Map<K, V>, mode: MergeMode, merger: (K, V?, V?) -> V?): TreapMap<K, V> =
+        m.useAsTreap(
+            { otherTreap ->
+                self.mergeWith(otherTreap, mode, getShallowMerger(mode, merger))
+                    ?: clear()
+            },
+            { fallbackMerge(m, mode, merger) }
+        )
+
+    /**
+        Merges the entries in `m` with the entries in this AbstractTreapMap, applying the "merger" function to get the
+        new values or each key, processing multiple entries in parallel.
+
+        @param[parallelThresholdLog2] The minimum number of entries to process in parallel, expressed as a power of 2.
+        If a subtree is estimated to have fewer entries than this, it will be processed sequentially.
+
+        @param[merger] The merge function to apply to each pair of entries.  Must be pure and thread-safe.
+     */
+    override fun parallelMerge(
+        m: Map<K, V>,
+        mode: MergeMode,
+        parallelThresholdLog2: Int,
+        merger: (K, V?, V?) -> V?
+    ): TreapMap<K, V> =
+        m.useAsTreap(
+            { otherTreap ->
+                self.parallelMergeWith(otherTreap, mode, parallelThresholdLog2, getShallowMerger(mode, merger))
+                    ?: clear()
+            },
+            { fallbackMerge(m, mode, merger) }
+        )
+
+    private fun fallbackMerge(m: Map<K, V>, mode: MergeMode, merger: (K, V?, V?) -> V?): TreapMap<K, V> {
+        var newThis = clear()
+        val keys = when(mode) {
+            MergeMode.UNION -> this.keys union m.keys
+            MergeMode.INTERSECTION -> this.keys intersect m.keys
+        }
+        for (k in keys) {
+            merger(k, this[k], m[k])?.let { newThis = newThis.put(k, it) }
+        }
+        return newThis
+    }
+
     /**
         Applies a transform to each entry, producing new values.
      */
     @Suppress("UNCHECKED_CAST", "Treapability")
     override fun <R : Any> updateValues(transform: (K, V) -> R?): TreapMap<K, R> =
-        (this as AbstractTreapMap<Any?, Any?, *, *>).updateValuesErasedTypes(
+        (this as AbstractTreapMap<Any?, Any?, *>).updateValuesErasedTypes(
             transform as (Any?, Any?) -> Any?
         ) as TreapMap<K, R>
 
@@ -169,7 +271,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, TK: TreapKey<K>, @Treapa
      */
     @Suppress("UNCHECKED_CAST", "Treapability")
     override fun <R : Any> parallelUpdateValues(parallelThresholdLog2: Int, transform: (K, V) -> R?): TreapMap<K, R> =
-        (this as AbstractTreapMap<Any?, Any?, *, *>).parallelUpdateValuesErasedTypes(
+        (this as AbstractTreapMap<Any?, Any?, *>).parallelUpdateValuesErasedTypes(
             parallelThresholdLog2,
             transform as (Any?, Any?) -> Any?
         ) as TreapMap<K, R>
@@ -227,13 +329,13 @@ internal sealed class AbstractTreapMap<@Treapable K, V, TK: TreapKey<K>, @Treapa
        }
        ```
      */
-    override fun updateValue(key: K, transform: (V?) -> V?): TreapMap<K, V> {
+    override fun <U> updateEntry(key: K, value: U, merger: (V?, U) -> V?): TreapMap<K, V> {
         val treapKey = key.toTreapKey()?.precompute()
         return if (treapKey == null) {
             // The key is not compatible with this map type, so it's definitely not in the map.
-            transform(null)?.let { put(key, it) } ?: this
+            merger(null, value)?.let { put(key, it) } ?: this
         } else {
-            self.updateValue(treapKey, key, transform, ::new) ?: clear()
+            self.updateEntry(treapKey, key, value, merger, ::new) ?: clear()
         }
     }
 
@@ -322,7 +424,7 @@ internal sealed class AbstractTreapMap<@Treapable K, V, TK: TreapKey<K>, @Treapa
 /**
     Removes a map entry (`entryKey`, `entryValue`) with key `key`.
  */
-internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.removeEntry(
+internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.removeEntry(
     key: TreapKey<K>,
     entryKey: K,
     entryValue: V
@@ -339,14 +441,15 @@ internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<
     }
 }
 
-internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>> S?.updateValue(
+internal fun <@Treapable K, V, U, @Treapable S : AbstractTreapMap<K, V, S>> S?.updateEntry(
     thatKey: TreapKey<K>,
     entryKey: K,
-    transform: (V?) -> V?,
+    toUpdate: U,
+    merger: (V?, U) -> V?,
     new: (K, V) -> S
 ): S? = when {
     this == null -> {
-        val generated = transform(null)
+        val generated = merger(null, toUpdate)
         if(generated == null) {
             null
         } else {
@@ -356,9 +459,9 @@ internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<
     else -> {
         val c = thatKey.comparePriorityTo(this)
         when {
-            c == 0 -> this.shallowUpdate(entryKey, transform) ?: (left join right)
+            c == 0 -> this.shallowUpdate(entryKey, toUpdate, merger) ?: (left join right)
             c > 0 -> {
-                val merged = transform(null)
+                val merged = merger(null, toUpdate)
                 if(merged == null) {
                     self
                 } else {
@@ -368,105 +471,186 @@ internal fun <@Treapable K, V, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<
                     }
                 }
             }
-            thatKey.compareKeyTo(this) < 0 -> this.with(left = this.left.updateValue(thatKey, entryKey, transform, new))
-            else -> this.with(right = this.right.updateValue(thatKey, entryKey, transform, new))
+            thatKey.compareKeyTo(this) < 0 -> this.with(left = this.left.updateEntry(thatKey, entryKey, toUpdate, merger, new))
+            else -> this.with(right = this.right.updateEntry(thatKey, entryKey, toUpdate, merger, new))
         }
     }
 }
 
-context(ThresholdForker<T>)
-internal fun <@Treapable K, V, U, TK: TreapKey<K>, @Treapable S : AbstractTreapMap<K, V, TK, S>, @Treapable T : AbstractTreapMap<K, U, TK, T>>
-S?.updateValuesImpl(
-    m: T?,
-    updater: (S?, T) -> S?
+/**
+    Merges two treaps, using a supplied merge function.  This is used to implement our Map<K, V>.merge() function.  It's
+    distinct from `union` because it needs to call the merge function even in cases where the key only exists in one of
+    the Treaps, to support the semantics of the higher-level Map.merge() function.  Note that we always prefer to return
+    'this' over 'that', to preserve the object identity invariant described in the `Treap` summary.
+ */
+internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.mergeWith(
+    that: S?,
+    mode: MergeMode,
+    shallowMerge: (S?, S?) -> S?
+): S? =
+    notForking(this to that) {
+        mergeWithImpl(that, mode, shallowMerge)
+    }
+
+internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.parallelMergeWith(
+    that: S?,
+    mode: MergeMode,
+    parallelThresholdLog2: Int,
+    shallowMerge: (S?, S?) -> S?
+): S? =
+    maybeForking(
+        this to that,
+        {
+            it.first.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1) &&
+            it.second.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1)
+        }
+    ) {
+        mergeWithImpl(that, mode, shallowMerge)
+    }
+
+context(ThresholdForker<Pair<S?, S?>>)
+private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.mergeWithImpl(
+    that: S?,
+    mode: MergeMode,
+    shallowMerge: (S?, S?) -> S?
 ): S? {
     val (newLeft, newRight, newThis) = when {
-        m == null -> return this
-        this == null -> {
-            fork(
-                m,
-                { null.updateValuesImpl(m.left, updater) },
-                { null.updateValuesImpl(m.right, updater) },
-                { updater(null, m) }
-            )
+        this == null && that == null -> {
+            return null
         }
-        this.comparePriorityTo(m) >= 0 -> {
-            val mSplit = m.split(this)
+        this == null || that == null -> when (mode) {
+            MergeMode.UNION -> fork(
+                this to that,
+                { this?.left.mergeWithImpl(that?.left, mode, shallowMerge) },
+                { this?.right.mergeWithImpl(that?.right, mode, shallowMerge) },
+                { shallowMerge(this, that) }
+            )
+            MergeMode.INTERSECTION -> return null
+        }
+        this.comparePriorityTo(that) >= 0 -> {
+            val thatSplit = that.split(this)
             fork(
-                m,
-                { this.left.updateValuesImpl(mSplit.left, updater) },
-                { this.right.updateValuesImpl(mSplit.right, updater) },
-                { mSplit.duplicate.let { if (it != null) { updater(this, it) } else { this }}}
+                this to that,
+                { this.left.mergeWithImpl(thatSplit.left, mode, shallowMerge) },
+                { this.right.mergeWithImpl(thatSplit.right, mode, shallowMerge) },
+                { shallowMerge(this, thatSplit.duplicate) }
             )
         }
         else -> {
-            val thisSplit = this.split(m)
+            // remember, a.comparePriorityTo(b)==0 <=> a.compareKeyTo(b)==0
+            val thisSplit = this.split(that)
             fork(
-                m,
-                { m.left.let { if (it == null) { thisSplit.left } else { thisSplit.left.updateValuesImpl(it, updater) }}},
-                { m.right.let { if (it == null) { thisSplit.right } else { thisSplit.right.updateValuesImpl(it, updater) }}},
-                { updater(thisSplit.duplicate, m) }
+                this to that,
+                { thisSplit.left.mergeWithImpl(that.left, mode, shallowMerge) },
+                { thisSplit.right.mergeWithImpl(that.right, mode, shallowMerge) },
+                { shallowMerge(thisSplit.duplicate, that) }
             )
         }
     }
     return newThis?.with(newLeft, newRight) ?: (newLeft join newRight)
 }
 
-internal fun <@Treapable K, V, U> TreapMap<K, V>.fallbackUpdateValues(
-    m: Map<K, U>,
-    transform: (K, V?, U) -> V?
-): TreapMap<K, V> {
-    var newThis = this
-    for ((k, u) in m.entries) {
-        newThis = newThis.updateValue(k) { v ->
-            transform(k, v, u)
+internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.unionWith(
+    that: S?,
+    shallowUnion: (S, S) -> S
+): S? =
+    notForking(this to that) {
+        unionWithImpl(that, shallowUnion)
+    }
+
+internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.parallelUnionWith(
+    that: S?,
+    parallelThresholdLog2: Int,
+    shallowUnion: (S, S) -> S
+): S? =
+    maybeForking(
+        this to that,
+        {
+            it.first.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1) &&
+            it.second.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1)
+        }
+    ) {
+        unionWithImpl(that, shallowUnion)
+    }
+
+context(ThresholdForker<Pair<S?, S?>>)
+private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.unionWithImpl(
+    that: S?,
+    shallowUnion: (S, S) -> S
+): S? {
+    val (newLeft, newRight, newThis) = when {
+        this == null -> return that
+        that == null -> return this
+        this.comparePriorityTo(that) >= 0 -> {
+            val thatSplit = that.split(this)
+            fork(
+                this to that,
+                { this.left.unionWithImpl(thatSplit.left, shallowUnion) },
+                { this.right.unionWithImpl(thatSplit.right, shallowUnion) },
+                { thatSplit.duplicate?.let { shallowUnion(this, it) } ?: this }
+            )
+        }
+        else -> {
+            val thisSplit = this.split(that)
+            fork(
+                this to that,
+                { thisSplit.left.unionWithImpl(that.left, shallowUnion) },
+                { thisSplit.right.unionWithImpl(that.right, shallowUnion) },
+                { thisSplit.duplicate?.let { shallowUnion(it, that) } ?: that }
+            )
         }
     }
-    return newThis
+    return newThis.with(newLeft, newRight)
 }
 
-internal fun <@Treapable K, V> TreapMap<K, V>.fallbackUnion(m: Map<K, V>, merger: (K, V, V) -> V): TreapMap<K, V> {
-    var r = this
-    for ((k, v) in m.entries) {
-        if (k in this) {
-            r += k to merger(k, this[k]!!, v)
-        } else {
-            r += k to v
+internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.intersectWith(
+    that: S?,
+    shallowIntersect: (S, S) -> S?
+): S? =
+    notForking(this to that) {
+        intersectWithImpl(that, shallowIntersect)
+    }
+
+internal fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.parallelIntersectWith(
+    that: S?,
+    parallelThresholdLog2: Int,
+    shallowIntersect: (S, S) -> S?
+): S? =
+    maybeForking(
+        this to that,
+        {
+            it.first.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1) &&
+            it.second.isApproximatelySmallerThanLog2(parallelThresholdLog2 - 1)
+        }
+    ) {
+        intersectWithImpl(that, shallowIntersect)
+    }
+
+context(ThresholdForker<Pair<S?, S?>>)
+private fun <@Treapable K, V, @Treapable S : AbstractTreapMap<K, V, S>> S?.intersectWithImpl(
+    that: S?,
+    shallowIntersect: (S, S) -> S?
+): S? {
+    val (newLeft, newRight, newThis) = when {
+        this == null || that == null -> return null
+        this.comparePriorityTo(that) >= 0 -> {
+            val thatSplit = that.split(this)
+            fork(
+                this to that,
+                { this.left.intersectWithImpl(thatSplit.left, shallowIntersect) },
+                { this.right.intersectWithImpl(thatSplit.right, shallowIntersect) },
+                { thatSplit.duplicate?.let { shallowIntersect(this, it) } }
+            )
+        }
+        else -> {
+            val thisSplit = this.split(that)
+            fork(
+                this to that,
+                { thisSplit.left.intersectWithImpl(that.left, shallowIntersect) },
+                { thisSplit.right.intersectWithImpl(that.right, shallowIntersect) },
+                { thisSplit.duplicate?.let { shallowIntersect(it, that) } }
+            )
         }
     }
-    return r
-}
-
-internal fun <@Treapable K, V, U, R> TreapMap<K, V>.fallbackIntersect(m: Map<K, U>, merger: (K, V, U) -> R): TreapMap<K, R> {
-    var r = treapMapOf<K, R>()
-    for ((k, v) in m.entries) {
-        if (k in this) {
-            r += k to merger(k, this[k]!!, v)
-        }
-    }
-    return r
-}
-
-internal fun <@Treapable K, V, U, R> TreapMap<K, V>.fallbackMerge(m: Map<K, U>, merger: (K, V?, U?) -> R?): TreapMap<K, R> {
-    var r = treapMapOf<K, R>()
-    for (k in this.keys union m.keys) {
-        merger(k, this[k], m[k])?.let { r += k to it }
-    }
-    return r
-}
-
-internal fun <@Treapable K, V, U, R> TreapMap<K, V>.fallbackMergeIntersection(m: Map<K, U>, merger: (K, V, U) -> R?): TreapMap<K, R> {
-    var r = treapMapOf<K, R>()
-    for (k in this.keys intersect m.keys) {
-        merger(k, this[k]!!, m[k]!!)?.let { r += k to it }
-    }
-    return r
-}
-
-internal fun <@Treapable K, V, R> TreapMap<K, V>.fallbackLookup(keys: Set<K>, transform: (K, V?) -> R): TreapMap<K, R> {
-    var r = treapMapOf<K, R>()    
-    for (k in keys) {
-        r += k to transform(k, this[k])
-    }
-    return r
+    return newThis?.with(newLeft, newRight) ?: (newLeft join newRight)
 }

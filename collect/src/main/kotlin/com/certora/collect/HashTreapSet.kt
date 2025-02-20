@@ -13,7 +13,7 @@ internal class HashTreapSet<@Treapable E>(
     override val next: ElementList.More<E>? = null,
     left: HashTreapSet<E>? = null,
     right: HashTreapSet<E>? = null
-) : AbstractTreapSet<E, TreapKey.Hashed<E>, HashTreapSet<E>>(left, right), TreapKey.Hashed<E>, ElementList<E> {
+) : AbstractTreapSet<E, HashTreapSet<E>>(left, right), TreapKey.Hashed<E>, ElementList<E> {
 
     override fun hashCode(): Int {
         var h = 0

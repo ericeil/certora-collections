@@ -1,5 +1,6 @@
 package com.certora.collect
 
+import com.certora.collect.TreapMap.MergeMode
 import kotlinx.collections.immutable.*
 
 internal class EmptyTreapMap<@Treapable K, V> private constructor() : TreapMap<K, V>, java.io.Serializable {
@@ -34,22 +35,11 @@ internal class EmptyTreapMap<@Treapable K, V> private constructor() : TreapMap<K
         transform: (K, V) -> R?
     ): TreapMap<K, R> = treapMapOf()
 
-    override fun <U> updateValues(
-        m: Map<K, U>,
-        transform: (K, V?, U) -> V?
-    ): TreapMap<K, V> = fallbackUpdateValues(m, transform)
-
-    override fun <U> parallelUpdateValues(
-        m: Map<K, U>,
-        parallelThresholdLog2: Int,
-        transform: (K, V?, U) -> V?
-    ): TreapMap<K, V> = fallbackUpdateValues(m, transform)
-
     override fun <R : Any> mapReduce(map: (K, V) -> R, reduce: (R, R) -> R): R? = null
     override fun <R : Any> parallelMapReduce(map: (K, V) -> R, reduce: (R, R) -> R, parallelThresholdLog2: Int): R? = null
 
-    override fun updateValue(key: K, transform: (V?) -> V?): TreapMap<K, V> =
-        when (val v = transform(null)) {
+    override fun <U> updateEntry(key: K, value: U, merger: (V?, U) -> V?): TreapMap<K, V> =
+        when (val v = merger(null, value)) {
             null -> this
             else -> put(key, v)
         }
@@ -57,17 +47,29 @@ internal class EmptyTreapMap<@Treapable K, V> private constructor() : TreapMap<K
     override fun union(m: Map<K, V>, merger: (K, V, V) -> V): TreapMap<K, V> = putAll(m)
     override fun parallelUnion(m: Map<K, V>, parallelThresholdLog2: Int, merger: (K, V, V) -> V): TreapMap<K, V> = putAll(m)
 
-    override fun <U, R> intersect(m: Map<K, U>, merger: (K, V, U) -> R): TreapMap<K, R> = treapMapOf()
-    override fun <U, R> parallelIntersect(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V, U) -> R): TreapMap<K, R> = treapMapOf()
+    override fun intersect(m: Map<K, V>, merger: (K, V, V) -> V): TreapMap<K, V> = this
+    override fun parallelIntersect(m: Map<K, V>, parallelThresholdLog2: Int, merger: (K, V, V) -> V): TreapMap<K, V> = this
 
-    override fun <U, R> merge(m: Map<K, U>, merger: (K, V?, U?) -> R?): TreapMap<K, R> = fallbackMerge(m, merger)
-    override fun <U, R> parallelMerge(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V?, U?) -> R?): TreapMap<K, R> = fallbackMerge(m, merger)
+    override fun merge(m: Map<K, V>, mode: MergeMode, merger: (K, V?, V?) -> V?): TreapMap<K, V> {
+        var map: TreapMap<K, V> = this
+        if (mode == MergeMode.UNION) {
+            for ((key, value) in m) {
+                val v = merger(key, null, value)
+                if (v != null) {
+                    map = map.put(key, v)
+                }
+            }
+        }
+        return map
+    }
 
-    override fun <U, R> mergeIntersection(m: Map<K, U>, merger: (K, V, U) -> R?): TreapMap<K, R> = fallbackMergeIntersection(m, merger)
-    override fun <U, R> parallelMergeIntersection(m: Map<K, U>, parallelThresholdLog2: Int, merger: (K, V, U) -> R?): TreapMap<K, R> = fallbackMergeIntersection(m, merger)
 
-    override fun <R> lookup(keys: Set<K>, transform: (K, V?) -> R): TreapMap<K, R> = fallbackLookup(keys, transform)
-    override fun <R> parallelLookup(keys: Set<K>, parallelThresholdLog2: Int, transform: (K, V?) -> R): TreapMap<K, R> = fallbackLookup(keys, transform)
+    override fun parallelMerge(
+        m: Map<K, V>,
+        mode: MergeMode,
+        parallelThresholdLog2: Int,
+        merger: (K, V?, V?) -> V?
+    ): TreapMap<K, V> = merge(m, mode, merger)
 
     override fun zip(m: Map<out K, V>): Sequence<Map.Entry<K, Pair<V?, V?>>> =
         m.asSequence().map { MapEntry(it.key, null to it.value) }

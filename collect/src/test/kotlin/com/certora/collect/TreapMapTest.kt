@@ -1,6 +1,7 @@
 package com.certora.collect
 
 import com.certora.collect.*
+import com.certora.collect.TreapMap.MergeMode
 import java.util.Random
 import kotlinx.collections.immutable.*
 import kotlinx.serialization.json.Json
@@ -373,16 +374,15 @@ abstract class TreapMapTest {
         assertVeryEqual(db, dm)
     }
 
-    fun testMapOf(vararg pairs: Pair<Int, Int>): TreapMap<TestKey, Int> {
-        val m = makeMap()
-        pairs.forEach { m.put(makeKey(it.first), it.second) }
+    fun testMapOf(vararg pairs: Pair<Int, Int>): TreapMap<Int, Int> {
         @Suppress("UNCHECKED_CAST")
-        return m.build() as TreapMap<TestKey, Int>
+        val m = makeMapOfInts() as TreapMap<Int, Int>
+        return m.putAll(pairs.toMap())
     }
 
     @Test
     fun merge() {
-        val merger = { _: TestKey?, v1: Int?, v2: Int? ->
+        val merger = { _: Int?, v1: Int?, v2: Int? ->
             (v1?:0) + (v2?:0)
         }
 
@@ -394,7 +394,7 @@ abstract class TreapMapTest {
             testMapOf(1 to 3, 2 to 3, 3 to 9, 4 to 6),
             testMapOf(1 to 2, 2 to 3, 3 to 4).merge(testMapOf(1 to 1, 3 to 5, 4 to 6), merger))
 
-        val merger2 = { _: TestKey?, v1: Int?, v2: Int? ->
+        val merger2 = { _: Int?, v1: Int?, v2: Int? ->
             when {
                 v1 == null || v2 == null -> -1
                 else -> v1 + v2
@@ -404,56 +404,56 @@ abstract class TreapMapTest {
         val m1 = testMapOf(2 to 2, 3 to 3)
         val m2 = testMapOf(3 to 3)
         assertEquals(
-            testMapOf(2 to -1, 3 to 6),
+            mapOf(2 to -1, 3 to 6),
             m2.merge(m1, merger2))
         assertEquals(
-            testMapOf(2 to -1, 3 to 6),
+            mapOf(2 to -1, 3 to 6),
             m1.merge(m2, merger2))
 
-        val merger3 = { _: TestKey?, v1: Int?, v2: Int? ->
+        val merger3 = { _: Int?, v1: Int?, v2: Int? ->
             when {
                 v1 == null || v2 == null -> -1
                 else -> null
             }
         }
         assertEquals(
-            testMapOf(2 to -1),
+            mapOf(2 to -1),
             m2.merge(m1, merger3))
         assertEquals(
-            testMapOf(2 to -1),
+            mapOf(2 to -1),
             m1.merge(m2, merger3))
     }
 
     @Test
-    fun mergeIntersection() {
-        val merger: (TestKey?, Int, Int) -> Int? = { _, v1, v2 ->
-            v1 + v2
+    fun mergeIntersectMode() {
+        val merger = { _: Int?, v1: Int?, v2: Int? ->
+            v1!! + v2!!
         }
 
-        assertEquals(testMapOf(), testMapOf().mergeIntersection(testMapOf(), merger))
-        assertEquals(testMapOf(), testMapOf(1 to 2).mergeIntersection(testMapOf(), merger))
-        assertEquals(testMapOf(), testMapOf().mergeIntersection(testMapOf(1 to 2), merger))
+        assertEquals(testMapOf(), testMapOf().merge(testMapOf(), MergeMode.INTERSECTION, merger))
+        assertEquals(testMapOf(), testMapOf(1 to 2).merge(testMapOf(), MergeMode.INTERSECTION, merger))
+        assertEquals(testMapOf(), testMapOf().merge(testMapOf(1 to 2), MergeMode.INTERSECTION, merger))
 
         assertEquals(
             testMapOf(1 to 3, 3 to 9),
-            testMapOf(1 to 2, 2 to 3, 3 to 4).mergeIntersection(testMapOf(1 to 1, 3 to 5, 4 to 6), merger))
+            testMapOf(1 to 2, 2 to 3, 3 to 4).merge(testMapOf(1 to 1, 3 to 5, 4 to 6), MergeMode.INTERSECTION, merger))
 
         val m1 = testMapOf(2 to 2, 3 to 3)
         val m2 = testMapOf(3 to 3)
         assertEquals(
-            testMapOf(3 to 6),
-            m2.mergeIntersection(m1, merger))
+            mapOf(3 to 6),
+            m2.merge(m1, MergeMode.INTERSECTION, merger))
         assertEquals(
-            testMapOf(3 to 6),
-            m1.mergeIntersection(m2, merger))
+            mapOf(3 to 6),
+            m1.merge(m2, MergeMode.INTERSECTION, merger))
 
-        val merger3: (TestKey?, Int, Int) -> Int? = { _, _, _ -> null }
+        val merger3 = { _: Int?, _: Int?, _: Int? -> null }
         assertEquals(
-            testMapOf(),
-            m2.mergeIntersection(m1, merger3))
+            mapOf(),
+            m2.merge(m1, MergeMode.INTERSECTION, merger3))
         assertEquals(
-            testMapOf(),
-            m1.mergeIntersection(m2, merger3))
+            mapOf(),
+            m1.merge(m2, MergeMode.INTERSECTION, merger3))
     }
 
     @Test
@@ -469,19 +469,19 @@ abstract class TreapMapTest {
         val m1 = testMapOf(2 to 2, 3 to 3)
         val m2 = testMapOf(3 to 4)
         assertEquals(
-            testMapOf(2 to 2, 3 to 3),
+            mapOf(2 to 2, 3 to 3),
             m1.union(m2) { _, a, _ -> a }
         )
         assertEquals(
-            testMapOf(2 to 2, 3 to 4),
+            mapOf(2 to 2, 3 to 4),
             m2.union(m1) { _, a, _ -> a }
         )
         assertEquals(
-            testMapOf(2 to 2, 3 to 4),
+            mapOf(2 to 2, 3 to 4),
             m1.union(m2) { _, _, b -> b }
         )
         assertEquals(
-            testMapOf(2 to 2, 3 to 3),
+            mapOf(2 to 2, 3 to 3),
             m2.union(m1) { _, _, b -> b }
         )
     }
@@ -499,78 +499,47 @@ abstract class TreapMapTest {
         val m1 = testMapOf(2 to 2, 3 to 3)
         val m2 = testMapOf(3 to 4)
         assertEquals(
-            testMapOf(3 to 3),
+            mapOf(3 to 3),
             m1.intersect(m2) { _, a, _ -> a }
         )
         assertEquals(
-            testMapOf(3 to 4),
+            mapOf(3 to 4),
             m2.intersect(m1) { _, a, _ -> a }
         )
         assertEquals(
-            testMapOf(3 to 4),
+            mapOf(3 to 4),
             m1.intersect(m2) { _, _, b -> b }
         )
         assertEquals(
-            testMapOf(3 to 3),
+            mapOf(3 to 3),
             m2.intersect(m1) { _, _, b -> b }
         )
     }
 
     @Test
-    fun updateValues() {
-        assertEquals(testMapOf(), testMapOf().updateValues(testMapOf()) { _, a, _ -> a })
-        assertEquals(testMapOf(1 to 2), testMapOf(1 to 2).updateValues(testMapOf()) { _, a, _ -> a })
-        assertEquals(testMapOf(1 to 2), testMapOf().updateValues(testMapOf(1 to 2)) { _, _, b -> b })
-        assertEquals(
-            testMapOf(1 to 2, 2 to 3, 3 to 4),
-            testMapOf(1 to 2, 2 to 3).updateValues(testMapOf(2 to 3, 3 to 4)) { _, _, b -> b }
-        )
-
-        val m1 = testMapOf(2 to 2, 3 to 3)
-        val m2 = testMapOf(3 to 4)
-        assertEquals(
-            testMapOf(2 to 2, 3 to 3),
-            m1.updateValues(m2) { _, a, _ -> a }
-        )
-        assertEquals(
-            testMapOf(3 to 4),
-            m2.updateValues(m1) { _, a, _ -> a }
-        )
-        assertEquals(
-            testMapOf(2 to 2, 3 to 4),
-            m1.updateValues(m2) { _, _, b -> b }
-        )
-        assertEquals(
-            testMapOf(2 to 2, 3 to 3),
-            m2.updateValues(m1) { _, _, b -> b }
-        )
-    }
-
-
-    @Test
     fun zip() {
         assertEquals(
-            setOf<Map.Entry<TestKey, Pair<Int?, Int?>>>(),
+            setOf<Map.Entry<Int, Pair<Int?, Int?>>>(),
             testMapOf().zip(testMapOf()).toSet()
         )
         assertEquals(
-            setOf(MapEntry(makeKey(1), null to 2)),
+            setOf(MapEntry(1, null to 2)),
             testMapOf().zip(testMapOf(1 to 2)).toSet()
         )
         assertEquals(
-            setOf(MapEntry(makeKey(1), 2 to null)),
+            setOf(MapEntry(1, 2 to null)),
             testMapOf(1 to 2).zip(testMapOf()).toSet()
         )
         assertEquals(
-            setOf(MapEntry(makeKey(1), 1 to null), MapEntry(makeKey(2), null to 2)),
+            setOf(MapEntry(1, 1 to null), MapEntry(2, null to 2)),
             testMapOf(1 to 1).zip(testMapOf(2 to 2)).toSet()
         )
         assertEquals(
-            setOf(MapEntry(makeKey(1), 2 to 3)),
+            setOf(MapEntry(1, 2 to 3)),
             testMapOf(1 to 2).zip(testMapOf(1 to 3)).toSet()
         )
         assertEquals(
-            setOf(MapEntry(makeKey(1), 2 to 3), MapEntry(makeKey(2), 3 to 4)),
+            setOf(MapEntry(1, 2 to 3), MapEntry(2, 3 to 4)),
             testMapOf(1 to 2, 2 to 3).zip(testMapOf(1 to 3, 2 to 4)).toSet()
         )
     }

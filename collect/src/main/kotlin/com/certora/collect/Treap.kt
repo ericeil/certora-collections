@@ -65,10 +65,10 @@ package com.certora.collect
 
     - Treaps impose special requirements on keys if they are serialized.  See [Treapable].
 */
-internal abstract class Treap<@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>>(
+internal abstract class Treap<@Treapable T, S : Treap<T, S>>(
     @JvmField val left: S?,
     @JvmField val right: S?
-) : TreapKey<K>, java.io.Serializable {
+) : TreapKey<T>, java.io.Serializable {
 
     abstract val self: S
 
@@ -101,7 +101,7 @@ internal abstract class Treap<@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>
         Derived classes use these to perform these operations in the face of hash collisions.
      */
     abstract infix fun shallowAdd(that: S): S
-    abstract fun shallowRemove(element: K): S?
+    abstract fun shallowRemove(element: T): S?
 
     /**
         Produces a sequence of all nodes in this Treap, which we use at a higher level to enumerate elements/entries.
@@ -126,7 +126,7 @@ internal abstract class Treap<@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>
     */
     fun computeSize(): Int = shallowSize + (left?.computeSize() ?: 0) + (right?.computeSize() ?: 0)
 
-    fun containsKey(key: TreapKey<K>): Boolean = (self.find(key) != null)
+    fun containsKey(key: TreapKey<T>): Boolean = (self.find(key) != null)
 
 
     /**
@@ -150,11 +150,8 @@ internal abstract class Treap<@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>
     Splits this treap into two treaps, one with keys less than `key`, and one greater.  Returns both, and if there was a
     node with the same key, returns that too.  This is a basic building block of other Treap operations.
  */
-internal fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.split(
-    key: TreapKey<K>?
-): Split<K, TK, S> = when {
-    this == null -> Split<K, TK, S>(left = null, right = null, duplicate = null)
-    key == null -> Split<K, TK, S>(left = left, right = right, duplicate = this)
+internal fun <@Treapable T, S : Treap<T, S>> Treap<T, S>?.split(key: TreapKey<T>): Split<T, S> = when {
+    this == null -> Split<T, S>(left = null, right = null, duplicate = null)
     else -> {
         val c = this.compareKeyTo(key)
         when {
@@ -171,18 +168,12 @@ internal fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.split(
             else -> {
                 // The keys are equal.  Both keys have the same Treap coordinates (priority and sort order), so there's
                 // nothing to split.
-                Split<K, TK, S>(left = left, right = right, duplicate = self)
+                Split<T, S>(left = left, right = right, duplicate = self)
             }
         }
     }
 }
-
-@Suppress("DataClassShouldBeImmutable") // This is for performance
-internal data class Split<@Treapable K, TK : TreapKey<K>, S : Treap<K, TK, S>>(
-    var left: S?, 
-    var right: S?, 
-    var duplicate: S?
-) {
+internal class Split<@Treapable T, S : Treap<T, S>>(var left: S?, var right: S?, var duplicate: S?) {
     override fun toString(): String = "Split(left=$left, right=$right, duplicate=$duplicate)"
 }
 
@@ -191,7 +182,7 @@ internal data class Split<@Treapable K, TK : TreapKey<K>, S : Treap<K, TK, S>>(
     Converse of `split.`  Combines this treap with another treap whose keys are all greater than any key in this treap.
     Another basic building block.
  */
-internal infix fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.join(greater: S?): S? = when {
+internal infix fun <@Treapable T, S : Treap<T, S>> S?.join(greater: S?): S? = when {
     this == null -> greater
     greater == null -> this
     this.comparePriorityTo(greater) < 0 -> greater.with(left = self join greater.left)
@@ -203,9 +194,9 @@ internal infix fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.join(
     Adds a single Treap node to this Treap, if its key does not already exist.  We precompute the key hashes for extra
     speed.
  */
-internal fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.add(that: S): S = add(that, that.precompute())
+internal fun <@Treapable T, S : Treap<T, S>> S?.add(that: S): S = add(that, that.precompute())
 
-private fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.add(that: S, thatKey: TreapKey<K>): S = when {
+private fun <@Treapable T, S : Treap<T, S>> Treap<T, S>?.add(that: S, thatKey: TreapKey<T>): S = when {
     that.left != null || that.right != null -> throw IllegalArgumentException("add requires a single treap node")
     this == null -> that
     else -> {
@@ -224,7 +215,7 @@ private fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.add(that: S,
 /**
     Removes `element` with key `key`.
  */
-internal fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.remove(key: TreapKey<K>, element: K): S? = when {
+internal fun <@Treapable T, S : Treap<T, S>> S?.remove(key: TreapKey<T>, element: T): S? = when {
     this == null -> null
     key.comparePriorityTo(this) > 0 -> this
     else -> {
@@ -240,7 +231,7 @@ internal fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.remove(key:
 /**
     Finds a given key in this Treap, and returns the Treap node.  Takes advantage of tail-recursion for speed.
  */
-internal tailrec fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.find(key: TreapKey<K>): S? = when {
+internal tailrec fun <@Treapable T, S : Treap<T, S>> S?.find(key: TreapKey<T>): S? = when {
     this == null -> null
     this.comparePriorityTo(key) < 0 -> null
     else -> {
@@ -256,7 +247,7 @@ internal tailrec fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.fin
 /**
     Compares two treaps for equality, according to the derived class' definition.
  */
-internal fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.deepEquals(that: S?): Boolean = when {
+internal fun <@Treapable T, S : Treap<T, S>> S?.deepEquals(that: S?): Boolean = when {
     this === that -> true
     this == null -> that == null
     that == null -> false
@@ -269,9 +260,7 @@ internal fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.deepEquals(
     Quickly estimates if this Treap is smaller than a given size, without actually counting the nodes.  Probes the depth
     along a single path, under the assumption that the tree is balanced.
  */
-internal tailrec fun <@Treapable K, TK: TreapKey<K>, S : Treap<K, TK, S>> S?.isApproximatelySmallerThanLog2(
-    sizeLog2: Int
-): Boolean = when {
+internal tailrec fun <@Treapable T, S : Treap<T, S>> S?.isApproximatelySmallerThanLog2(sizeLog2: Int): Boolean = when {
     sizeLog2 < 0 -> throw IllegalArgumentException("sizeLog2 must be positive")
     this == null -> true
     sizeLog2 == 0 -> false
