@@ -3,22 +3,13 @@ package com.certora.collect
 import kotlin.random.Random
 import kotlin.test.*
 import kotlinx.collections.immutable.*
+import org.junit.Rule
 
 /** Tests for [TreapList]. */
 class TreapListTest {
-    /**
-        Each test starts from the same priority sequence, so tree shape does not depend on test order or on
-        [Random.Default].
-     */
-    @BeforeTest
-    fun seedListPriorities() {
-        TreapListNode.priorityRandomOverride = Random(LIST_PRIORITY_SEED)
-    }
-
-    @AfterTest
-    fun restoreListPriorities() {
-        TreapListNode.priorityRandomOverride = null
-    }
+    @field:Rule
+    @JvmField
+    val treapListPriorities = TreapListPriorityRule()
 
     @Test
     fun empty() {
@@ -434,11 +425,11 @@ class TreapListTest {
     @Test
     fun shapeDependentPaths() {
         // Higher priority sits closer to the root. One draw per element, in order.
-        TreapListNode.priorityRandomOverride = FixedPriorityRandom(intArrayOf(10, 50, 30, 100, 20, 40, 5))
+        TreapListNode.setTreapListPriorityRandom(FixedPriorityRandom(intArrayOf(10, 50, 30, 100, 20, 40, 5)))
         val list = (0..6).toTreapList()
         assertEquals((0..6).toList(), list.toList())
         // computeHashCode recurses into right only when a node has one. The lists hashCodes() builds
-        // under LIST_PRIORITY_SEED have none, so hash this tree, which does.
+        // under the per-test seed have none, so hash this tree, which does.
         assertEquals(persistentListOf(0, 1, 2, 3, 4, 5, 6).hashCode(), list.hashCode())
 
         for (i in list.indices) {
@@ -639,7 +630,4 @@ class TreapListTest {
         }
     }
 
-    private companion object {
-        const val LIST_PRIORITY_SEED = 1
-    }
 }

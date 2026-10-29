@@ -388,17 +388,31 @@ internal class TreapListNode<E> private constructor(
 
     companion object {
         /**
-            Optional replacement for [Random.Default] when drawing node priorities.
+            Per-thread replacement for [Random.Default] when drawing node priorities.
 
-            Null, the production setting, draws from [Random.Default] as before. That generator is thread-local and
-            unseeded, so two runs build different tree shapes and take different indexing and iteration branches.
-            Tests assign a seeded [Random] here. The null check is the only added production step, and a stable null
-            folds away, leaving the original call. An override is not thread-safe.
+            No installation on this thread, the production setting, draws from [Random.Default]. That generator is
+            itself thread-local and unseeded. Tests install a seeded [Random] on the test thread, so one test cannot
+            see another test's draws. A fork/join worker does not inherit the installation. The [ThreadLocal] read is
+            the only added production step.
          */
-        @JvmField
-        internal var priorityRandomOverride: Random? = null
+        private val priorityRandom = ThreadLocal<Random?>()
 
-        private fun nextPriority(): Int = (priorityRandomOverride ?: Random.Default).nextInt()
+        internal fun setTreapListPriorityRandom(random: Random?) {
+            if (random == null) {
+                priorityRandom.remove()
+            } else {
+                priorityRandom.set(random)
+            }
+        }
+
+        private fun nextPriority(): Int {
+            val override = priorityRandom.get()
+            return if (override == null) {
+                Random.Default.nextInt()
+            } else {
+                override.nextInt()
+            }
+        }
 
         private infix fun <E> TreapListNode<E>?.append(that: TreapListNode<E>?): TreapListNode<E>? = when {
             this == null -> that
