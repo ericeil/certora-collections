@@ -3,8 +3,7 @@ package com.certora.collect
 import kotlin.test.*
 
 /**
- * Each test states the behavior the public API should have. They are ignored because the
- * implementation does not do that yet, and this change set does not modify product code.
+ * Each test states the behavior the public API should have.
  */
 class ProductBugTest {
     @Test
@@ -46,11 +45,6 @@ class ProductBugTest {
     }
 
     @Test
-    @Ignore(
-        "TreapListBuilder.size is captured once from the list passed to the constructor and never updated. " +
-            "isEmpty() reads the live list, so after add/clear the reported size disagrees with the contents " +
-            "and subList checks the stale size. Reproduce: treapListOf(1).builder().apply { add(2) }.size."
-    )
     fun listBuilderSizeTracksEdits() {
         val builder = treapListOf(1).builder()
         builder.add(2)
