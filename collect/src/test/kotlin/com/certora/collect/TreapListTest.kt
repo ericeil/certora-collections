@@ -576,6 +576,28 @@ class TreapListTest {
         assertFailsWith<NoSuchElementException> { builder.removeFirst() }
     }
 
+
+    @Test
+    fun builderIteratorRejectsSetOrRemoveAfterStructuralChange() {
+        val builder = treapListOf(10, 20, 30).builder()
+        val iterator = builder.listIterator()
+        assertEquals(10, iterator.next())
+        iterator.remove()
+        assertFailsWith<IllegalStateException> { iterator.set(99) }
+        assertFailsWith<IllegalStateException> { iterator.remove() }
+        assertEquals(listOf(20, 30), builder.build())
+
+        assertEquals(20, iterator.next())
+        iterator.add(25)
+        assertFailsWith<IllegalStateException> { iterator.set(99) }
+        assertFailsWith<IllegalStateException> { iterator.remove() }
+        assertEquals(listOf(20, 25, 30), builder.build())
+
+        assertEquals(30, iterator.next())
+        iterator.set(35)
+        assertEquals(listOf(20, 25, 35), builder.build())
+    }
+
     @Test
     fun listIteratorFromMiddle() {
         val iterator = treapListOf(1, 2, 3, 4, 5).listIterator(3)
